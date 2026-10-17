@@ -1,0 +1,30 @@
+SoloGo KataGo 资源来源与校验
+=============================
+
+1. Android arm64 CPU 引擎
+   文件：app/src/main/jniLibs/arm64-v8a/libkatago.so
+   来源：https://github.com/ChuiShui233/KataGO_Android
+   路径：KataGO_Android/app/src/main/jniLibs/arm64-v8a/libkatago.so
+   SHA256：0483976b081b0dd1c8f518c8c9c16eef01d6b1d2d95ded3abc588bf101179b96
+   MD5：0d2fed176600f5af41ef8ffd76b28ebe
+   说明：该仓库声明基于 KataGo 1.17.2 构建，CPU 版本通过 exec() + GTP 使用。
+   上游引擎：https://github.com/lightvector/KataGo （MIT）
+
+2. GTP 配置
+   文件：app/src/main/assets/katago/gtp.cfg
+   来源：https://github.com/ChuiShui233/KataGO_Android
+   路径：KataGO_Android/app/src/main/assets/gtp.cfg
+   SHA256：4219fe6867f01f6ad03718cc4eed3f78c4e5ed81defd8ddc5402c508ded46b03
+   修改：numSearchThreads=4、maxTime=2.0、maxVisits=120，优先降低单步等待时间，
+   同时保留 APP 端 42℃ 高温暂停保护。
+
+3. 神经网络权重
+   文件：app/src/main/assets/katago/model.txt（内容为 gzip 文本权重）
+   来源：https://katagotraining.org/networks/
+   原始文件：kata1-b6c96-s30394624-d4635675.txt.gz
+   SHA256：6fdba41fd1e191aa4df310fe0b179437da086f9750d8ad8e408af261ebdd2e03
+   MD5：84820894643ff4761b41ca7980a97ceb
+   许可：KataGo Neural Network License（见 assets/licenses/）
+   说明：选择 5MB 左右的官方 kata1 小网络，优先保证手机 CPU 的启动速度和发热表现；
+   它不是当前最强网络，但足以用于基础人机对弈和本地学习复盘。若要提升棋力，
+   可替换为同目录下更新的 .bin.gz/.txt.gz 网络，并同步更新 checksums.properties。

@@ -86,3 +86,10 @@ lint/tmp/
 
 # Android Profiling
 *.hprof
+
+# Local build environment created during KataGo integration verification
+.android-sdk/
+.android-user/
+.gradle-home/
+.kotlin/
+.temp/

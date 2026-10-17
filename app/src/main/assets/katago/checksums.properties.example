@@ -1,0 +1,4 @@
+# 复制为 checksums.properties 后填入真实 MD5。
+katago.md5=
+model.md5=
+gtp-cfg.md5=
