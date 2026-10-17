@@ -74,12 +74,28 @@ sgf/
 
 ## 构建
 
-环境要求：Android Studio、Android SDK Platform 37、JDK 17、Gradle Wrapper 9.6.0。
+环境要求：Android Studio（可使用其自带 JBR）、Android SDK Platform 37、JDK 17+、Gradle Wrapper 9.6.0。首次构建需要联网下载 Gradle 和 Maven 依赖。
+
+### 从干净 clone 构建
+
+仓库不提交 `local.properties`、Android SDK 或 Gradle 缓存。clone 后任选一种方式指定 SDK：
 
 ```powershell
-# 在 Android Studio 中打开项目后，先完成 SDK 安装和 Gradle Sync
+git clone https://gitee.com/nandouliuxing/solo-go.git
+cd solo-go
+
+# 方式 A：临时环境变量（适合命令行/CI）
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+$env:ANDROID_HOME = "C:\Users\<你的用户名>\AppData\Local\Android\Sdk"
+$env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
 .\gradlew.bat :app:assembleDebug
 ```
+
+方式 B：用 Android Studio 打开项目，等待 IDE 生成 `local.properties` 并完成 Sync，然后点 Run，或在项目根目录执行上面的 Gradle 命令。
+
+SDK 至少需要 `platforms;android-37.0` 和 `build-tools;37.0.0`（AGP 也可能自动安装兼容的 Build Tools）。KataGo 的 arm64 二进制、权重、`gtp.cfg` 和 MD5 清单已经在仓库中，不需要在 clone 后手动复制。
+
+本次已用 `git clone` 到临时目录、通过 `ANDROID_HOME` 指定 SDK，执行了一次干净的 `:app:assembleDebug`，93 个任务全部成功。
 
 本轮已经在本机安装了项目私有的最小 Android SDK，并成功执行：
 
