@@ -226,20 +226,6 @@ fun ReviewScreen(
                     container.billing.launchPurchase(a)
                 }
             },
-            onWatchAd = {
-                val a = activity
-                if (a == null) {
-                    scope.launch { snackbar.showSnackbar("当前页面无法播放广告") }
-                } else {
-                    container.ads.showRewarded(
-                        activity = a,
-                        onReward = vm::unlockWithAd,
-                        onUnavailable = { message ->
-                            scope.launch { snackbar.showSnackbar(message) }
-                        }
-                    )
-                }
-            },
             onDismiss = vm::dismissPaywall
         )
     }

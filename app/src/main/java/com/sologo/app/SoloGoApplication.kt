@@ -17,14 +17,13 @@ class SoloGoApplication : Application() {
         super.onCreate()
         container = AppContainer(this)
 
-        // 隐私同意后才初始化广告/计费；拒绝时基础围棋功能不受影响。
+        // 隐私同意后才启动商店计费；拒绝时基础围棋功能不受影响。
         container.appScope.launch {
             container.settings.settings
                 .map { it.privacyAccepted }
                 .distinctUntilChanged()
                 .collect { accepted ->
                     if (accepted) {
-                        container.ads.initialize()
                         container.billing.start()
                     }
                 }
@@ -33,7 +32,7 @@ class SoloGoApplication : Application() {
         // 市场审核硬性要求：切后台强制结束 KataGo，绝不让它继续占 CPU。
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
-                // 回到前台后恢复商店连接；广告 SDK 已同意过隐私则可继续使用。
+                // 回到前台后恢复商店连接。
                 container.billing.start()
             }
 

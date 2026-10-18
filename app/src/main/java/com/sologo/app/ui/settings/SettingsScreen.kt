@@ -19,7 +19,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -35,10 +34,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sologo.app.AppContainer
 import com.sologo.app.FeatureFlags
-import com.sologo.app.ui.components.BannerAd
-import com.sologo.core.model.PlayStyle
-import com.sologo.core.model.StoneColor
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,38 +61,12 @@ fun SettingsScreen(
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text("对局", style = MaterialTheme.typography.titleMedium)
-                    Text("棋盘路数", style = MaterialTheme.typography.labelLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(9, 13, 19).forEach { size ->
-                            FilterChip(
-                                selected = settings.boardSize == size,
-                                onClick = { vm.setBoardSize(size) },
-                                label = { Text("${size} 路") }
-                            )
-                        }
-                    }
-                    Text("执子颜色", style = MaterialTheme.typography.labelLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = settings.humanColor == StoneColor.BLACK,
-                            onClick = { vm.setHumanColor(StoneColor.BLACK) },
-                            label = { Text("执黑") }
-                        )
-                        FilterChip(
-                            selected = settings.humanColor == StoneColor.WHITE,
-                            onClick = { vm.setHumanColor(StoneColor.WHITE) },
-                            label = { Text("执白") }
-                        )
-                    }
-                    Text("贴目：${settings.komi}", style = MaterialTheme.typography.labelLarge)
-                    Slider(
-                        value = settings.komi,
-                        onValueChange = { vm.setKomi((it * 2).roundToInt() / 2f) },
-                        valueRange = 0f..15f,
-                        steps = 29
+                    Text("对局设置", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "棋盘大小、执子颜色、贴目和 AI 等级已移到首页“开始人机对局”上方。",
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
@@ -107,26 +76,7 @@ fun SettingsScreen(
                     modifier = Modifier.padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("AI 搜索", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "最大 visits：${settings.maxVisits}。数值越高越强，也越耗电。高温保护会在 42℃ 暂停搜索。",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Text("速度预设", style = MaterialTheme.typography.labelLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf(40, 60, 120, 300).forEach { value ->
-                            FilterChip(
-                                selected = settings.maxVisits == value,
-                                onClick = { vm.setVisits(value) },
-                                label = { Text("$value") }
-                            )
-                        }
-                    }
-                    Slider(
-                        value = settings.maxVisits.toFloat(),
-                        onValueChange = { vm.setVisits(it.roundToInt()) },
-                        valueRange = 20f..4000f
-                    )
+                    Text("AI 分析", style = MaterialTheme.typography.titleMedium)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
@@ -142,27 +92,8 @@ fun SettingsScreen(
                             label = { Text(if (settings.autoAnalyze) "开" else "关") }
                         )
                     }
-                    Text("下法风格", style = MaterialTheme.typography.labelLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        PlayStyle.entries.forEach { style ->
-                            FilterChip(
-                                selected = settings.playStyle == style,
-                                onClick = { vm.setPlayStyle(style) },
-                                label = { Text(style.displayName) }
-                            )
-                        }
-                    }
                     Text(
-                        "自然/多变会使用温度和根节点采样，让每局着法更有差异；不是 HumanSL 的真实段位模仿。",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        if (FeatureFlags.unlockAllForTesting) {
-                            "测试模式：visits 不设免费上限；默认 60，40 更快，120/300 更深。"
-                        } else {
-                            "默认 60，兼顾速度和棋力；40 更快，120/300 更深。免费对局最高按 120 visits 执行。"
-                        },
+                        "AI 等级会自动决定搜索量、思考时间和着法温度，无需再手动调参数。",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -178,9 +109,7 @@ fun SettingsScreen(
                     Text(
                         if (FeatureFlags.unlockAllForTesting) "测试模式：全部高级功能已开放，release 恢复付费门禁。"
                         else if (settings.premiumUnlocked) "已买断，永久解锁。"
-                        else if (settings.adUnlockUntilEpochMs > System.currentTimeMillis()) {
-                            "已通过激励视频临时解锁。"
-                        } else "未解锁",
+                        else "未解锁",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     if (!FeatureFlags.unlockAllForTesting && !settings.premiumUnlocked) {
@@ -218,7 +147,6 @@ fun SettingsScreen(
                     )
                 }
             }
-            BannerAd(ads = container.ads)
         }
     }
 }

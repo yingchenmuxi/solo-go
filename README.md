@@ -8,7 +8,7 @@ SoloGo 是一个 Android / Kotlin / Jetpack Compose 单机围棋学习工具。�
 core   -> 棋盘/棋谱/分析领域模型，显示用提子缓存
 engine -> KataGo 进程、GTP、资源安装、温度监控
 sgf    -> SGF FF[4] 解析/写出、分析 JSON
-app    -> Compose UI、MVVM、SGF 文件、隐私、广告、内购
+app    -> Compose UI、MVVM、SGF 文件、隐私、内购
 ```
 
 ## 先读：原需求里必须修正的三处
@@ -40,7 +40,7 @@ app/
   src/main/java/com/sologo/app/
     AppContainer.kt / SoloGoApplication.kt / MainActivity.kt
     data/              SettingsRepository、SgfRepository
-    monetization/      AdMob、Google Play Billing
+    monetization/      Google Play Billing
     ui/components/     GoBoard、图表、隐私/付费弹窗、Banner
     ui/game/           GameScreen、GameViewModel
     ui/review/         ReviewScreen、ReviewViewModel
@@ -70,7 +70,7 @@ sgf/
 
 当前 APK 资源总体约 12MB，暂不涉及 Play Asset Delivery；正式上架前仍要确认商店包体和权重许可证。默认棋力/速度配置是 **60 visits、4 线程、单步最多 2 秒**，可在设置里切 40/60/120/300。
 
-设置页提供 **稳定 / 自然 / 多变** 三档下法风格。它们通过 `chosenMoveTemperature*`、`rootNumSymmetriesToSample` 和 LCB 开关增加着法差异，适合手机 CPU；这不是 HumanSL 的真实人类段位模仿。官方 HumanSL 模型约 99MB，当前没有塞进 APK。
+首页“开始人机对局”上方可选择 **10K / 5K / 1K / 1段 / 3段**。每档会自动决定 visits、搜索时间上限和着法温度（内部对应稳定/自然/多变参数），设置页不再暴露 visits。默认使用 5K；这些是手机算力下的近似水平，不是 HumanSL 的真实人类段位模仿。官方 HumanSL 模型约 99MB，当前没有塞进 APK。
 
 因为随包的 Android 引擎按 API 29 工具链构建，工程 `minSdk` 同步设为 29（Android 10）。如果必须支持 Android 7–9，需要换用对应 API 级别编译的 `libkatago.so`，不能直接复用当前二进制。
 
@@ -117,16 +117,15 @@ app/build/outputs/apk/debug/sologo_20261017_215210.apk
 
 SGF/棋盘逻辑通过小型 smoke test；官方 Windows Eigen 版 KataGo 也已用同一份模型和 cfg 实测 `name`、`boardsize`、`genmove`、`kata-analyze`、`printsgf`、`final_score`，说明模型和配置格式有效。
 
-## 广告与内购配置
+## 内购配置
 
-- AdMob 当前使用 Google 官方测试 App ID 和测试广告位，发布前必须替换 `AndroidManifest.xml` 和 `AdsManager.kt` 中的 ID。
 - 内购商品 ID 是 `premium_review_unlock`，发布前在 Play Console 创建同名一次性商品。
 - 测试真实扣款需要 Play Console 内测轨道 + 许可测试账号；debug 包无法凭空完成商店扣款。
-- 广告只在隐私同意后初始化；对局页没有插屏/弹窗广告。Banner 出现在首页、棋谱库和设置页。
+- 当前版本不包含广告 SDK，也不会显示 Banner、插屏或激励视频。
 
 ## 合规实现点
 
-- 隐私弹窗：首次启动强制二选一；拒绝后基础功能正常，广告/购买入口不初始化。
+- 隐私弹窗：首次启动强制二选一；拒绝后基础功能正常，商店购买入口不初始化。
 - 进程：`ProcessLifecycleOwner.onStop` 调用 `shutdownNow()`；离开对局/复盘 ViewModel 也会结束进程。
 - 温度：读取 `ACTION_BATTERY_CHANGED`，超过 42℃ 调用 `stop` 并阻止新的 AI 搜索；不需要额外权限。
 - 权限：仅 `INTERNET`、`ACCESS_NETWORK_STATE`；SGF 导入导出走 SAF，不申请存储权限。
@@ -139,7 +138,7 @@ SGF/棋盘逻辑通过小型 smoke test；官方 Windows Eigen 版 KataGo 也已
 3. **SGF**：用带变化、注释、AB/AW 的棋谱做导入导出回归；确认外部软件可打开。
 4. **Compose 棋盘**：9/13/19 路触摸、提子显示、最后一手、候选点。
 5. **分析与复盘**：`kata-analyze` 输出解析、领地热力、胜率/目数曲线、逐手亏损。
-6. **商业化与合规**：AdMob 正式 ID、UMP/隐私、Play Billing、退款/恢复购买、商店素材和隐私政策 URL。
+6. **商业化与合规**：Play Billing、退款/恢复购买、商店素材和隐私政策 URL。
 7. **稳定性**：低端机温度/内存/进程卡死测试、后台切换、旋转、深色模式、弱网。
 
 更细的分步计划见 [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)。

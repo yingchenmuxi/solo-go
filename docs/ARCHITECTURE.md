@@ -18,7 +18,7 @@ SGF 文件和 JSON 分析由 `SgfRepository` + `AnalysisStore` 处理，不经�
 
 - `GameUiState`：棋盘显示、轮次、手数、候选、胜率、目数、温度、错误。
 - `ReviewUiState`：棋谱、局面列表、当前手、复盘分析、进度、温度。
-- `AppSettings`：隐私决定、买断、激励视频到期时间、路数、贴目、visits、执子颜色。
+- `AppSettings`：隐私决定、买断、路数、贴目、AI 等级、自动分析、执子颜色。
 
 ## 线程
 

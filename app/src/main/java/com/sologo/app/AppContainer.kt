@@ -3,7 +3,6 @@ package com.sologo.app
 import android.app.Application
 import com.sologo.app.data.SettingsRepository
 import com.sologo.app.data.SgfRepository
-import com.sologo.app.monetization.AdsManager
 import com.sologo.app.monetization.BillingRepository
 import com.sologo.engine.BatteryTemperatureMonitor
 import com.sologo.engine.KataGoEngine
@@ -22,7 +21,6 @@ class AppContainer(application: Application) {
     val sgfRepository = SgfRepository(application)
     val engine = KataGoEngine(application)
     val battery = BatteryTemperatureMonitor(application)
-    val ads = AdsManager(application)
     val billing = BillingRepository(application) { unlocked ->
         appScope.launch { settings.setPremiumUnlocked(unlocked) }
     }
@@ -31,7 +29,6 @@ class AppContainer(application: Application) {
         appScope.launch {
             val settingsState = settings.settings.first()
             if (settingsState.privacyAccepted) {
-                ads.initialize()
                 billing.start()
             }
         }

@@ -41,7 +41,7 @@ fun AboutScreen(onBack: () -> Unit) {
             Text("SoloGo", style = MaterialTheme.typography.headlineMedium)
             Text(
                 "单机围棋学习工具。基础人机对局、SGF 棋谱管理和本地复盘可离线使用，" +
-                    "高级分析通过应用商店一次性内购或激励视频解锁。",
+                    "高级分析通过应用商店一次性内购解锁。",
                 style = MaterialTheme.typography.bodyMedium
             )
             Text("KataGo", style = MaterialTheme.typography.titleLarge)

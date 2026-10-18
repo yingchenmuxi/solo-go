@@ -192,20 +192,6 @@ fun GameScreen(
                     container.billing.launchPurchase(a)
                 }
             },
-            onWatchAd = {
-                val a = activity
-                if (a == null) {
-                    scope.launch { snackbarHostState.showSnackbar("当前页面无法播放广告") }
-                } else {
-                    container.ads.showRewarded(
-                        activity = a,
-                        onReward = vm::unlockWithAd,
-                        onUnavailable = { message ->
-                            scope.launch { snackbarHostState.showSnackbar(message) }
-                        }
-                    )
-                }
-            },
             onDismiss = vm::dismissPaywall
         )
     }
@@ -283,7 +269,7 @@ private fun StatusCard(
                 }
             } else {
                 Text(
-                    text = "高级复盘未解锁 · $priceText 买断或观看激励视频体验",
+                    text = "高级复盘未解锁 · $priceText 买断解锁",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

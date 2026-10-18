@@ -40,7 +40,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.sologo.app.AppContainer
 import com.sologo.app.data.SavedGame
-import com.sologo.app.ui.components.BannerAd
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.io.File
@@ -135,7 +134,6 @@ fun LibraryScreen(
                     )
                 }
             }
-            BannerAd(ads = container.ads)
         }
     }
 

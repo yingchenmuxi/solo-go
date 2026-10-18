@@ -149,7 +149,7 @@ class ReviewViewModel(
                 it.copy(analyzing = true, progress = 0f, error = null, message = "正在启动 KataGo…")
             }
             try {
-                val visits = settings.settings.first().maxVisits.coerceAtLeast(80)
+                val visits = settings.settings.first().aiLevel.analysisVisits
                 container.engine.initialize()
                 // 优先让 KataGo 读取 SGF（可保留 AB/AW 摆子）；失败则退回空棋盘重放。
                 val loadedSgf = runCatching {
@@ -220,13 +220,6 @@ class ReviewViewModel(
 
     fun dismissPaywall() {
         _state.update { it.copy(showPaywall = false) }
-    }
-
-    fun unlockWithAd() {
-        viewModelScope.launch {
-            settings.grantAdUnlock()
-            _state.update { it.copy(showPaywall = false, advancedAccess = true) }
-        }
     }
 
     fun unlockWithPurchase() {

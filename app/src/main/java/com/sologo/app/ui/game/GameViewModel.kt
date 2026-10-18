@@ -162,12 +162,8 @@ class GameViewModel(
             positionHistory.add(BoardPosition.empty(resolvedSize))
             try {
                 engine.initialize()
-                engine.setPlayStyle(currentSettings.playStyle)
-                val effectiveVisits = if (currentSettings.hasAdvancedAccess()) {
-                    currentSettings.maxVisits
-                } else {
-                    currentSettings.maxVisits.coerceAtMost(120)
-                }
+                engine.setPlayStyle(currentSettings.aiLevel.playStyle)
+                val effectiveVisits = currentSettings.aiLevel.visits
                 engine.newGame(resolvedSize, resolvedKomi, effectiveVisits)
                 _uiState.update {
                     it.copy(busy = false, status = "你执${resolvedHumanColor.chineseName}，请落子")
@@ -280,7 +276,7 @@ class GameViewModel(
         analysisJob = viewModelScope.launch {
             _uiState.update { it.copy(analysisVisible = true, status = "KataGo 思考中…") }
             try {
-                val visits = settings.settings.first().maxVisits.coerceAtLeast(80)
+                val visits = settings.settings.first().aiLevel.analysisVisits
                 val analysis = engine.analyze(
                     maxVisits = visits,
                     intervalMs = 300,
@@ -335,13 +331,6 @@ class GameViewModel(
 
     fun dismissPaywall() {
         _uiState.update { it.copy(showPaywall = false) }
-    }
-
-    fun unlockWithAd() {
-        viewModelScope.launch {
-            settings.grantAdUnlock()
-            _uiState.update { it.copy(showPaywall = false, advancedAccess = true) }
-        }
     }
 
     fun unlockWithPurchase() {
@@ -433,9 +422,8 @@ class GameViewModel(
             try {
                 val current = settings.settings.first()
                 engine.initialize()
-                engine.setPlayStyle(current.playStyle)
-                val effectiveVisits = if (current.hasAdvancedAccess()) current.maxVisits
-                else current.maxVisits.coerceAtMost(120)
+                engine.setPlayStyle(current.aiLevel.playStyle)
+                val effectiveVisits = current.aiLevel.visits
                 engine.newGame(state.boardSize, state.komi, effectiveVisits)
                 state.moves.forEach { move ->
                     if (!move.comment.contains("认输")) {
@@ -542,7 +530,7 @@ class GameViewModel(
             }
             try {
                 val analysis = engine.analyze(
-                    maxVisits = settings.settings.first().maxVisits.coerceAtLeast(40),
+                    maxVisits = settings.settings.first().aiLevel.analysisVisits,
                     intervalMs = 300,
                     durationMs = 450,
                     turn = _uiState.value.turn

@@ -9,7 +9,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,8 +35,8 @@ fun PrivacyDialog(
                     "SoloGo 是单机围棋学习工具。基础对弈、SGF 棋谱管理和本地复盘不需要账号，也不会上传棋谱。"
                 )
                 Text(
-                    "同意后才会初始化广告 SDK（AdMob），用于展示底部 Banner 和用户主动观看的激励视频。" +
-                        "拒绝不影响基础围棋功能，但广告解锁和商店购买相关入口将不可用。"
+                    "本 APP 不包含广告 SDK。同意后才会启用应用商店购买相关功能；" +
+                        "拒绝不会影响基础围棋、SGF 和本地复盘。"
                 )
                 Text(
                     "KataGo 在本机以子进程运行。切到后台或退出对局页时，APP 会立即结束该进程，避免持续占用 CPU。"
@@ -60,7 +59,6 @@ fun PrivacyDialog(
 fun PaywallDialog(
     priceText: String,
     onBuy: () -> Unit,
-    onWatchAd: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -81,10 +79,7 @@ fun PaywallDialog(
             Button(onClick = onBuy) { Text("买断 · $priceText") }
         },
         dismissButton = {
-            Column(horizontalAlignment = androidx.compose.ui.Alignment.End) {
-                OutlinedButton(onClick = onWatchAd) { Text("看广告解锁 24 小时") }
-                TextButton(onClick = onDismiss) { Text("以后再说") }
-            }
+            TextButton(onClick = onDismiss) { Text("以后再说") }
         }
     )
 }
