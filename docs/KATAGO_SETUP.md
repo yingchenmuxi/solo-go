@@ -38,6 +38,11 @@ gtp-cfg.md5=...
 当前随包的 `gtp.cfg` 使用 `numSearchThreads=4`、`maxTime=2.0`、`maxVisits=120`；
 APP 端默认 60 visits，单步最多约 2 秒，并保留 42℃ 高温暂停保护。
 
+`KataGoEngine` 还会根据设置页的“稳定/自然/多变”通过 `kata-set-param` 调整：
+`chosenMoveTemperatureEarly`、`chosenMoveTemperature`、`chosenMoveTemperatureHalflife`、
+`chosenMoveTemperatureOnlyBelowProb`、`rootNumSymmetriesToSample` 和 `useLcbForSelection`。
+这能增加手机低 visits 下的着法变化，但不是 HumanSL 的段位/年代风格模仿。
+
 ## 崩溃排查
 
 1. 先看 Logcat 中 `KataGoInstaller`、`GtpClient` 的日志。

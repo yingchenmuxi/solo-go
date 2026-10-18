@@ -5,6 +5,7 @@ import android.util.Log
 import com.sologo.core.model.CandidateMove
 import com.sologo.core.model.GoCoordinates
 import com.sologo.core.model.GoPoint
+import com.sologo.core.model.PlayStyle
 import com.sologo.core.model.PositionAnalysis
 import com.sologo.core.model.StoneColor
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,7 @@ class KataGoEngine(
     private var installed: InstalledEngine? = null
     private var boardSize = 19
     private var visits = config.defaultVisits
+    private var playStyle = PlayStyle.NATURAL
     private val _state = MutableStateFlow(EngineState.IDLE)
     val state: StateFlow<EngineState> = _state.asStateFlow()
     private val _lastError = MutableStateFlow<String?>(null)
@@ -68,6 +70,7 @@ class KataGoEngine(
             client.command("komi 7.5", 15_000)
             client.command("clear_board", 15_000)
             setVisitsInternal(visits)
+            setPlayStyleInternal(playStyle)
             _state.value = EngineState.READY
             _lastError.value = null
         } catch (t: Throwable) {
@@ -89,6 +92,15 @@ class KataGoEngine(
         client.command("komi $komi")
         client.command("clear_board")
         setVisitsInternal(visits)
+        setPlayStyleInternal(playStyle)
+    }
+
+    /** 选择下法变化档位；引擎已启动时立即生效，下一局也会沿用。 */
+    suspend fun setPlayStyle(style: PlayStyle) {
+        playStyle = style
+        if (_state.value == EngineState.READY) {
+            setPlayStyleInternal(style)
+        }
     }
 
     suspend fun setVisits(value: Int) {
@@ -198,6 +210,21 @@ class KataGoEngine(
     private suspend fun setVisitsInternal(value: Int) {
         // KataGo 的 GTP 扩展；若某个旧版本不支持，保留 config 里的默认值即可。
         runCatching { gtp!!.command("kata-set-param maxVisits $value", 10_000) }
+    }
+
+    private suspend fun setPlayStyleInternal(style: PlayStyle) {
+        val params = listOf(
+            "chosenMoveTemperatureEarly" to style.earlyTemperature,
+            "chosenMoveTemperature" to style.temperature,
+            "chosenMoveTemperatureHalflife" to style.temperatureHalflife,
+            "chosenMoveTemperatureOnlyBelowProb" to style.onlyBelowProb,
+            "rootNumSymmetriesToSample" to style.rootSymmetries,
+            "useLcbForSelection" to style.useLcb
+        )
+        params.forEach { (key, value) ->
+            // 参数兼容性按 KataGo 版本处理；不支持时保留默认值，不影响对局。
+            runCatching { gtp!!.command("kata-set-param $key $value", 10_000) }
+        }
     }
 
     private fun parseAnalysis(lines: List<String>, turn: StoneColor): PositionAnalysis {

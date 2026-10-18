@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sologo.app.AppContainer
 import com.sologo.app.data.AppSettings
+import com.sologo.core.model.PlayStyle
 import com.sologo.core.model.StoneColor
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +34,10 @@ class SettingsViewModel(
 
     fun setAutoAnalyze(value: Boolean) = viewModelScope.launch {
         container.settings.setAutoAnalyze(value)
+    }
+
+    fun setPlayStyle(value: PlayStyle) = viewModelScope.launch {
+        container.settings.setPlayStyle(value)
     }
 
     fun setHumanColor(value: StoneColor) = viewModelScope.launch {

@@ -70,6 +70,8 @@ sgf/
 
 当前 APK 资源总体约 12MB，暂不涉及 Play Asset Delivery；正式上架前仍要确认商店包体和权重许可证。默认棋力/速度配置是 **60 visits、4 线程、单步最多 2 秒**，可在设置里切 40/60/120/300。
 
+设置页提供 **稳定 / 自然 / 多变** 三档下法风格。它们通过 `chosenMoveTemperature*`、`rootNumSymmetriesToSample` 和 LCB 开关增加着法差异，适合手机 CPU；这不是 HumanSL 的真实人类段位模仿。官方 HumanSL 模型约 99MB，当前没有塞进 APK。
+
 因为随包的 Android 引擎按 API 29 工具链构建，工程 `minSdk` 同步设为 29（Android 10）。如果必须支持 Android 7–9，需要换用对应 API 级别编译的 `libkatago.so`，不能直接复用当前二进制。
 
 ## 构建

@@ -162,6 +162,7 @@ class GameViewModel(
             positionHistory.add(BoardPosition.empty(resolvedSize))
             try {
                 engine.initialize()
+                engine.setPlayStyle(currentSettings.playStyle)
                 val effectiveVisits = if (currentSettings.hasAdvancedAccess()) {
                     currentSettings.maxVisits
                 } else {
@@ -432,6 +433,7 @@ class GameViewModel(
             try {
                 val current = settings.settings.first()
                 engine.initialize()
+                engine.setPlayStyle(current.playStyle)
                 val effectiveVisits = if (current.hasAdvancedAccess()) current.maxVisits
                 else current.maxVisits.coerceAtMost(120)
                 engine.newGame(state.boardSize, state.komi, effectiveVisits)

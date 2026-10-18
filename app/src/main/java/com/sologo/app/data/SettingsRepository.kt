@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.sologo.app.FeatureFlags
+import com.sologo.core.model.PlayStyle
 import com.sologo.core.model.StoneColor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -28,6 +29,7 @@ data class AppSettings(
     val komi: Float = 7.5f,
     val maxVisits: Int = 60,
     val autoAnalyze: Boolean = false,
+    val playStyle: PlayStyle = PlayStyle.NATURAL,
     val humanColor: StoneColor = StoneColor.BLACK
 ) {
     /** 一次性买断 + 激励视频临时解锁，都视为高级分析可用。 */
@@ -50,6 +52,7 @@ class SettingsRepository(context: Context) {
         val komi = floatPreferencesKey("komi")
         val maxVisits = intPreferencesKey("max_visits")
         val autoAnalyze = booleanPreferencesKey("auto_analyze")
+        val playStyle = stringPreferencesKey("play_style")
         val humanColor = stringPreferencesKey("human_color")
     }
 
@@ -68,6 +71,9 @@ class SettingsRepository(context: Context) {
                 komi = preferences[Keys.komi] ?: 7.5f,
                 maxVisits = (preferences[Keys.maxVisits] ?: 60).coerceIn(20, 4000),
                 autoAnalyze = preferences[Keys.autoAnalyze] ?: false,
+                playStyle = runCatching {
+                    PlayStyle.valueOf(preferences[Keys.playStyle] ?: PlayStyle.NATURAL.name)
+                }.getOrDefault(PlayStyle.NATURAL),
                 humanColor = runCatching {
                     StoneColor.valueOf(preferences[Keys.humanColor] ?: StoneColor.BLACK.name)
                 }.getOrDefault(StoneColor.BLACK)
@@ -105,6 +111,10 @@ class SettingsRepository(context: Context) {
 
     suspend fun setAutoAnalyze(value: Boolean) {
         store.edit { it[Keys.autoAnalyze] = value }
+    }
+
+    suspend fun setPlayStyle(value: PlayStyle) {
+        store.edit { it[Keys.playStyle] = value.name }
     }
 
     suspend fun setHumanColor(value: StoneColor) {

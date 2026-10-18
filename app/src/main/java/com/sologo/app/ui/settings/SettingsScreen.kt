@@ -36,6 +36,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sologo.app.AppContainer
 import com.sologo.app.FeatureFlags
 import com.sologo.app.ui.components.BannerAd
+import com.sologo.core.model.PlayStyle
 import com.sologo.core.model.StoneColor
 import kotlin.math.roundToInt
 
@@ -141,6 +142,21 @@ fun SettingsScreen(
                             label = { Text(if (settings.autoAnalyze) "开" else "关") }
                         )
                     }
+                    Text("下法风格", style = MaterialTheme.typography.labelLarge)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        PlayStyle.entries.forEach { style ->
+                            FilterChip(
+                                selected = settings.playStyle == style,
+                                onClick = { vm.setPlayStyle(style) },
+                                label = { Text(style.displayName) }
+                            )
+                        }
+                    }
+                    Text(
+                        "自然/多变会使用温度和根节点采样，让每局着法更有差异；不是 HumanSL 的真实段位模仿。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Text(
                         if (FeatureFlags.unlockAllForTesting) {
                             "测试模式：visits 不设免费上限；默认 60，40 更快，120/300 更深。"
