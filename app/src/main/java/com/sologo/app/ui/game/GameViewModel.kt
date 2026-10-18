@@ -221,16 +221,20 @@ class GameViewModel(
     /** 悔棋：一次退回“人类落子前”，如果 AI 已经回应则连续 undo 两手。 */
     fun undo() {
         val state = _uiState.value
-        if (!state.started || state.busy || state.moves.isEmpty()) return
+        if (!state.started || state.busy) return
+        val lastHumanIndex = state.moves.indexOfLast { it.color == state.humanColor }
+        if (lastHumanIndex < 0) {
+            _events.tryEmit(GameEvent.Message("还没有你的落子，无法悔棋"))
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(busy = true, status = "正在悔棋…") }
             try {
                 val moves = state.moves.toMutableList()
-                repeat(2) {
-                    if (moves.isEmpty()) return@repeat
+                // 回退到最后一手人类落子之前，连同其后的 AI 应手一起撤销。
+                val removeCount = moves.size - lastHumanIndex
+                repeat(removeCount) {
                     engine.undo()
-                    // 不使用 MutableList.removeLast()：Android 10 的 java.util.List
-                    // 没有 Java 21 新增的 removeLast() 平台方法，运行时会 NoSuchMethodError。
                     moves.removeAt(moves.lastIndex)
                     if (positionHistory.size > 1) {
                         positionHistory.removeAt(positionHistory.lastIndex)
@@ -251,9 +255,6 @@ class GameViewModel(
                         winrate = null,
                         scoreLead = null
                     )
-                }
-                if (moves.isNotEmpty() && moves.last().color != state.humanColor) {
-                    maybeAiMove()
                 }
             } catch (t: Throwable) {
                 _uiState.update { it.copy(busy = false, status = "悔棋失败", error = t.message) }

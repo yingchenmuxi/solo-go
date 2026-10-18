@@ -16,7 +16,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -29,8 +28,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -47,6 +48,7 @@ import com.sologo.app.ui.components.GoBoard
 import com.sologo.app.ui.components.PaywallDialog
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,16 +117,16 @@ fun GameScreen(
                 candidates = if (state.analysisVisible) state.candidates else emptyList(),
                 onIntersectionTap = vm::onBoardTap
             )
-            if (state.busy) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
+            AiThinkingTimer(
+                active = state.busy && state.turn != state.humanColor
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedButton(
                     onClick = vm::undo,
-                    enabled = !state.busy && state.moves.isNotEmpty(),
+                    enabled = !state.busy && state.moves.any { it.color == state.humanColor },
                     modifier = Modifier.weight(1f)
                 ) { Text("悔棋") }
                 OutlinedButton(
@@ -193,6 +195,28 @@ fun GameScreen(
                 }
             },
             onDismiss = vm::dismissPaywall
+        )
+    }
+}
+
+@Composable
+private fun AiThinkingTimer(active: Boolean) {
+    var seconds by remember { mutableStateOf(0) }
+    LaunchedEffect(active) {
+        seconds = 0
+        if (active) {
+            while (true) {
+                delay(1_000)
+                seconds++
+            }
+        }
+    }
+    if (active) {
+        Text(
+            text = "AI 思考中 · ${seconds}s",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }
