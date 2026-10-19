@@ -25,7 +25,8 @@ data class EngineConfig(
     /** 首次加载普通权重 + 99MB HumanSL 权重时，手机上可能需要几十秒。 */
     val startupTimeoutMs: Long = 180_000,
     val commandTimeoutMs: Long = 30_000,
-    val genmoveTimeoutMs: Long = 120_000,
+    // HumanSL 首轮推理可能很慢；避免把“慢”直接报成错误，正常搜索仍由 maxTime 限制。
+    val genmoveTimeoutMs: Long = 240_000,
     val analysisIntervalMs: Int = 300,
     val analysisDurationMs: Long = 700
 )

@@ -230,6 +230,8 @@ class KataGoEngine(
     private suspend fun setVisitsInternal(value: Int) {
         // KataGo 的 GTP 扩展；若某个旧版本不支持，保留 config 里的默认值即可。
         runCatching { gtp!!.command("kata-set-param maxVisits $value", 10_000) }
+        // HumanSL 的模型推理时间不一定受 maxVisits 约束，显式再限制一次。
+        runCatching { gtp!!.command("kata-set-param maxTime 2.0", 10_000) }
     }
 
     private suspend fun setPlayStyleInternal(style: PlayStyle) {
