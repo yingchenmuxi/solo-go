@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -15,7 +16,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -29,8 +29,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sologo.app.AppContainer
 import com.sologo.core.model.AiLevel
+import com.sologo.core.model.GameRules
+import com.sologo.core.model.HandicapOptions
 import com.sologo.core.model.StoneColor
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,7 +87,20 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text("规则", style = MaterialTheme.typography.labelSmall)
+                        GameRules.entries.forEach { rule ->
+                            FilterChip(
+                                selected = settings.rules == rule,
+                                onClick = { vm.setRules(rule) },
+                                label = { Text(rule.displayName) }
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                     ) {
@@ -112,25 +126,22 @@ fun HomeScreen(
                         )
                     }
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                     ) {
                         Text("让子", style = MaterialTheme.typography.labelSmall)
-                        listOf(0, 2, 3, 4, 5).forEach { stones ->
+                        HandicapOptions.ALLOWED.forEach { stones ->
                             FilterChip(
                                 selected = settings.handicap == stones,
                                 onClick = { vm.setHandicap(stones) },
-                                label = { Text(if (stones == 0) "无" else "$stones") }
+                                label = { Text(HandicapOptions.label(stones)) }
                             )
                         }
                     }
-                    Text("贴目：${settings.komi}", style = MaterialTheme.typography.labelSmall)
-                    Slider(
-                        value = settings.komi,
-                        onValueChange = { vm.setKomi((it * 2).roundToInt() / 2f) },
-                        valueRange = 0f..15f,
-                        steps = 29
+                    Text(
+                        "贴目：${settings.rules.formatKomi(settings.handicap)}（自动）",
+                        style = MaterialTheme.typography.labelSmall
                     )
                     Button(onClick = onStartGame, modifier = Modifier.fillMaxWidth()) {
                         Text("开始人机对局")

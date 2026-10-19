@@ -232,7 +232,8 @@ private fun CompactGameHeader(
             Row(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = "你执${if (state.humanColor.name == "BLACK") "黑" else "白"} · " +
-                        "第 ${state.moves.size} 手 · ${state.boardSize}路 · 贴目 ${state.komi}",
+                        "第 ${state.moves.size} 手 · ${state.rules.displayName} · " +
+                        "${state.boardSize}路 · 贴目 ${state.komi}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

@@ -17,8 +17,7 @@ enum class AiLevel(
     TEN_K("10K", visits = 5, analysisVisits = 60, playStyle = PlayStyle.VARIED, humanProfile = "rank_10k"),
     FIVE_K("5K", visits = 8, analysisVisits = 80, playStyle = PlayStyle.VARIED, humanProfile = "rank_5k"),
     ONE_K("1K", visits = 10, analysisVisits = 120, playStyle = PlayStyle.NATURAL, humanProfile = "rank_1k"),
-    ONE_DAN("1段", visits = 15, analysisVisits = 240, playStyle = PlayStyle.NATURAL, humanProfile = "rank_1d"),
-    THREE_DAN("3段", visits = 20, analysisVisits = 400, playStyle = PlayStyle.STABLE, humanProfile = "rank_3d");
+    ONE_DAN("1段", visits = 15, analysisVisits = 240, playStyle = PlayStyle.NATURAL, humanProfile = "rank_1d");
 
     companion object {
         val DEFAULT = FIVE_K

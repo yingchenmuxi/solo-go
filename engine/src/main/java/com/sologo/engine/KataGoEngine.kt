@@ -5,6 +5,7 @@ import android.util.Log
 import com.sologo.core.model.CandidateMove
 import com.sologo.core.model.GoCoordinates
 import com.sologo.core.model.GoPoint
+import com.sologo.core.model.GameRules
 import com.sologo.core.model.HandicapStones
 import com.sologo.core.model.PlayStyle
 import com.sologo.core.model.PositionAnalysis
@@ -129,11 +130,19 @@ class KataGoEngine(
         }
     }
 
-    /** 设置 HumanSL 的人类水平 profile，例如 rank_10k / rank_1k / rank_3d。 */
+    /** 设置 HumanSL 的人类水平 profile，例如 rank_10k / rank_1k / rank_1d。 */
     suspend fun setHumanProfile(profile: String) {
         humanProfile = profile
         if (_state.value == EngineState.READY) {
             setHumanStyleInternal()
+        }
+    }
+
+    /** 中国规则显式设置；KataGo 默认沿用 gtp.cfg 中的默认规则。 */
+    suspend fun setRules(rules: GameRules) {
+        val gtpName = rules.gtpName ?: return
+        if (_state.value == EngineState.READY) {
+            runCatching { gtp!!.command("kata-set-rules $gtpName", 10_000) }
         }
     }
 

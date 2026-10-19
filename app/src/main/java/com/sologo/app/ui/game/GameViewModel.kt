@@ -8,7 +8,9 @@ import com.sologo.app.data.SgfRepository
 import com.sologo.core.model.BoardPosition
 import com.sologo.core.model.CandidateMove
 import com.sologo.core.model.GameRecord
+import com.sologo.core.model.GameRules
 import com.sologo.core.model.GoPoint
+import com.sologo.core.model.HandicapOptions
 import com.sologo.core.model.HandicapStones
 import com.sologo.core.model.MoveRecord
 import com.sologo.core.model.PositionAnalysis
@@ -33,6 +35,7 @@ import java.io.File
 data class GameUiState(
     val boardSize: Int = 19,
     val komi: Float = 7.5f,
+    val rules: GameRules = GameRules.CHINESE,
     val handicap: Int = 0,
     val setupBlack: List<GoPoint> = emptyList(),
     val humanColor: StoneColor = StoneColor.BLACK,
@@ -132,17 +135,17 @@ class GameViewModel(
     /** 由对局页在进入时调用；重复调用不会重复开新局。 */
     fun startGame(
         size: Int? = null,
-        komi: Float? = null,
         humanColor: StoneColor? = null
     ) {
         if (_uiState.value.started && !_uiState.value.gameOver) return
         viewModelScope.launch {
             val currentSettings = settings.settings.first()
             val resolvedSize = size ?: currentSettings.boardSize
-            val resolvedKomi = komi ?: currentSettings.komi
-            val resolvedHandicap = currentSettings.handicap.coerceIn(0, 9)
+            val resolvedRules = currentSettings.rules
+            val resolvedHandicap = HandicapOptions.normalize(currentSettings.handicap)
+            val resolvedKomi = resolvedRules.komiFor(resolvedHandicap)
             // 让子棋默认由人类执黑，AI 执白。
-            val resolvedHumanColor = if (resolvedHandicap > 0) {
+            val resolvedHumanColor = if (resolvedHandicap != 0) {
                 StoneColor.BLACK
             } else {
                 humanColor ?: currentSettings.humanColor
@@ -155,6 +158,7 @@ class GameViewModel(
                     error = null,
                     boardSize = resolvedSize,
                     komi = resolvedKomi,
+                    rules = resolvedRules,
                     handicap = resolvedHandicap,
                     setupBlack = setupPoints,
                     humanColor = resolvedHumanColor,
@@ -163,7 +167,8 @@ class GameViewModel(
                         black = setupPoints.toSet(),
                         white = emptySet()
                     ),
-                    turn = StoneColor.BLACK,
+                    // 让子棋白棋先行；分先/让先仍由黑棋先行。
+                    turn = if (resolvedHandicap > 0) StoneColor.WHITE else StoneColor.BLACK,
                     moves = emptyList(),
                     started = true,
                     gameOver = false,
@@ -189,19 +194,27 @@ class GameViewModel(
                 engine.initialize()
                 engine.setPlayStyle(currentSettings.aiLevel.playStyle)
                 engine.setHumanProfile(currentSettings.aiLevel.humanProfile)
+                engine.setRules(resolvedRules)
                 val effectiveVisits = currentSettings.aiLevel.visits
-                engine.newGame(resolvedSize, resolvedKomi, effectiveVisits, resolvedHandicap)
+                engine.newGame(
+                    resolvedSize,
+                    resolvedKomi,
+                    effectiveVisits,
+                    resolvedHandicap.coerceAtLeast(0)
+                )
                 _uiState.update {
                     it.copy(
                         busy = false,
                         status = if (resolvedHandicap > 0) {
-                            "让 $resolvedHandicap 子，你执黑，请落子"
+                            "让 $resolvedHandicap 子，KataGo 执白先行"
+                        } else if (resolvedHandicap == -1) {
+                            "让先，你执黑，请落子"
                         } else {
                             "你执${resolvedHumanColor.chineseName}，请落子"
                         }
                     )
                 }
-                if (resolvedHumanColor == StoneColor.WHITE) {
+                if (resolvedHumanColor == StoneColor.WHITE || resolvedHandicap > 0) {
                     maybeAiMove()
                 }
             } catch (t: Throwable) {
@@ -386,7 +399,8 @@ class GameViewModel(
                 val record = GameRecord(
                     size = state.boardSize,
                     komi = state.komi,
-                    handicap = state.handicap,
+                    rules = state.rules.sgfName,
+                    handicap = state.handicap.coerceAtLeast(0),
                     setupBlack = state.setupBlack,
                     moves = state.moves,
                     result = if (state.gameOver) "已结束" else ""
@@ -461,8 +475,14 @@ class GameViewModel(
                 engine.initialize()
                 engine.setPlayStyle(current.aiLevel.playStyle)
                 engine.setHumanProfile(current.aiLevel.humanProfile)
+                engine.setRules(state.rules)
                 val effectiveVisits = current.aiLevel.visits
-                engine.newGame(state.boardSize, state.komi, effectiveVisits, state.handicap)
+                engine.newGame(
+                    state.boardSize,
+                    state.komi,
+                    effectiveVisits,
+                    state.handicap.coerceAtLeast(0)
+                )
                 state.moves.forEach { move ->
                     if (!move.comment.contains("认输")) {
                         engine.play(move.color, move.point)

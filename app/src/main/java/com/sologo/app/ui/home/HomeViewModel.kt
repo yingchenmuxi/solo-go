@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.sologo.app.AppContainer
 import com.sologo.app.data.AppSettings
 import com.sologo.core.model.AiLevel
+import com.sologo.core.model.GameRules
 import com.sologo.core.model.StoneColor
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,13 +25,13 @@ class HomeViewModel(
         container.settings.setBoardSize(value)
     }
 
-    fun setKomi(value: Float) = viewModelScope.launch {
-        container.settings.setKomi(value)
-    }
-
     fun setHandicap(value: Int) = viewModelScope.launch {
         container.settings.setHandicap(value)
-        if (value > 0) container.settings.setHumanColor(StoneColor.BLACK)
+        if (value != 0) container.settings.setHumanColor(StoneColor.BLACK)
+    }
+
+    fun setRules(value: GameRules) = viewModelScope.launch {
+        container.settings.setRules(value)
     }
 
     fun setAiLevel(value: AiLevel) = viewModelScope.launch {

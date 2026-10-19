@@ -23,10 +23,6 @@ class SettingsViewModel(
         container.settings.setBoardSize(value)
     }
 
-    fun setKomi(value: Float) = viewModelScope.launch {
-        container.settings.setKomi(value)
-    }
-
     fun setAutoAnalyze(value: Boolean) = viewModelScope.launch {
         container.settings.setAutoAnalyze(value)
     }

@@ -5,12 +5,13 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.sologo.app.FeatureFlags
 import com.sologo.core.model.AiLevel
+import com.sologo.core.model.GameRules
+import com.sologo.core.model.HandicapOptions
 import com.sologo.core.model.StoneColor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -24,8 +25,9 @@ data class AppSettings(
     val privacyDecisionMade: Boolean = false,
     val premiumUnlocked: Boolean = false,
     val boardSize: Int = 19,
-    val komi: Float = 7.5f,
+    /** -1 = 让先，0 = 分先，2/3/4/5/9 = 让子数；贴目由规则自动计算。 */
     val handicap: Int = 0,
+    val rules: GameRules = GameRules.CHINESE,
     val aiLevel: AiLevel = AiLevel.DEFAULT,
     val autoAnalyze: Boolean = false,
     val humanColor: StoneColor = StoneColor.BLACK
@@ -45,8 +47,8 @@ class SettingsRepository(context: Context) {
         val privacyDecisionMade = booleanPreferencesKey("privacy_decision_made")
         val premiumUnlocked = booleanPreferencesKey("premium_unlocked")
         val boardSize = intPreferencesKey("board_size")
-        val komi = floatPreferencesKey("komi")
         val handicap = intPreferencesKey("handicap")
+        val rules = stringPreferencesKey("rules")
         val aiLevel = stringPreferencesKey("ai_level")
         val autoAnalyze = booleanPreferencesKey("auto_analyze")
         val humanColor = stringPreferencesKey("human_color")
@@ -63,8 +65,10 @@ class SettingsRepository(context: Context) {
                 privacyDecisionMade = preferences[Keys.privacyDecisionMade] ?: false,
                 premiumUnlocked = preferences[Keys.premiumUnlocked] ?: false,
                 boardSize = (preferences[Keys.boardSize] ?: 19).coerceIn(9, 19),
-                komi = preferences[Keys.komi] ?: 7.5f,
-                handicap = (preferences[Keys.handicap] ?: 0).coerceIn(0, 9),
+                handicap = HandicapOptions.normalize(preferences[Keys.handicap] ?: 0),
+                rules = runCatching {
+                    GameRules.valueOf(preferences[Keys.rules] ?: GameRules.CHINESE.name)
+                }.getOrDefault(GameRules.CHINESE),
                 aiLevel = runCatching {
                     AiLevel.valueOf(preferences[Keys.aiLevel] ?: AiLevel.DEFAULT.name)
                 }.getOrDefault(AiLevel.DEFAULT),
@@ -90,12 +94,12 @@ class SettingsRepository(context: Context) {
         store.edit { it[Keys.boardSize] = value.coerceIn(9, 19) }
     }
 
-    suspend fun setKomi(value: Float) {
-        store.edit { it[Keys.komi] = value }
+    suspend fun setHandicap(value: Int) {
+        store.edit { it[Keys.handicap] = HandicapOptions.normalize(value) }
     }
 
-    suspend fun setHandicap(value: Int) {
-        store.edit { it[Keys.handicap] = value.coerceIn(0, 9) }
+    suspend fun setRules(value: GameRules) {
+        store.edit { it[Keys.rules] = value.name }
     }
 
     suspend fun setAiLevel(value: AiLevel) {
