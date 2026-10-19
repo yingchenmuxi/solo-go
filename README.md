@@ -65,12 +65,13 @@ sgf/
 2. `app/src/main/assets/katago/model.txt`（文件内容是 gzip 文本权重；安装到 filesDir 后为 `model.txt.gz`）
 3. `app/src/main/assets/katago/gtp.cfg`（`numSearchThreads=4`、`maxTime=2.0`）
 4. `app/src/main/assets/katago/checksums.properties`
+5. `app/src/main/assets/katago/human-model.bin`（gzip 的 HumanSL 权重，安装后为 `human-model.bin.gz`）
 
-资源来源、SHA256 和修改说明记录在 [SOURCES.txt](app/src/main/assets/katago/SOURCES.txt)。二进制来自基于 KataGo 1.17.2 的 Android 构建仓库；权重是官方 `kata1` 小网络，体积约 5MB，优先保证手机启动速度和发热表现。它不是当前最强网络，若需要更高棋力可替换为更新的 `.bin.gz/.txt.gz` 网络，并同步更新 MD5。
+资源来源、SHA256 和修改说明记录在 [SOURCES.txt](app/src/main/assets/katago/SOURCES.txt)。普通权重是官方 `kata1` 小网络（约 5MB），HumanSL 权重是官方 `b18c384nbt-humanv0`（约 99MB）。
 
-当前 APK 资源总体约 12MB，暂不涉及 Play Asset Delivery；正式上架前仍要确认商店包体和权重许可证。默认棋力/速度配置是 **60 visits、4 线程、单步最多 2 秒**，可在设置里切 40/60/120/300。
+当前 debug APK 约 147MB，因为 HumanSL 权重随包携带；正式上架前需要确认商店包体限制，必要时改用 Play Asset Delivery 或首次下载。默认 5K profile，搜索受 `maxTime=2s` 和 4 线程限制。
 
-首页“开始人机对局”上方可选择 **10K / 5K / 1K / 1段 / 3段**。每档会自动决定 visits、搜索时间上限和着法温度（内部对应稳定/自然/多变参数），设置页不再暴露 visits。默认使用 5K；这些是手机算力下的近似水平，不是 HumanSL 的真实人类段位模仿。官方 HumanSL 模型约 99MB，当前没有塞进 APK。
+首页“开始人机对局”上方可选择 **10K / 5K / 1K / 1段 / 3段**。每档会自动选择 HumanSL 的 `rank_*` profile，并调整 visits、搜索时间和着法温度；设置页不再暴露 visits。HumanSL 是无搜索的人类策略模型，实际强度仍受手机算力、profile 和模型本身限制。
 
 因为随包的 Android 引擎按 API 29 工具链构建，工程 `minSdk` 同步设为 29（Android 10）。如果必须支持 Android 7–9，需要换用对应 API 级别编译的 `libkatago.so`，不能直接复用当前二进制。
 
@@ -105,17 +106,17 @@ SDK 至少需要 `platforms;android-37.0` 和 `build-tools;37.0.0`（AGP 也可�
 .\gradlew.bat :app:assembleDebug
 ```
 
-产物为 `app/build/outputs/apk/debug/app-debug.apk`（约 56.4MB，SHA256 `C47BE479B4E8952529578B5ED204AB218A082E18201D923EA12200013A9B12AD`）。APK 内已确认包含 `lib/arm64-v8a/libkatago.so`、`assets/katago/model.txt`、`gtp.cfg` 和 MD5 清单。由于当前没有连接 arm64 真机/模拟器，尚未验证实际设备上的进程执行和触摸体验；这一步需要在 Android 10+ arm64 真机上安装 APK 后完成。
+产物为 `app/build/outputs/apk/debug/app-debug.apk`（约 147MB，SHA256 `B47A152551D3066463AD16444487CE791D7265A1914CD495B2C28B087FD1D0C0`）。APK 内已确认包含 `lib/arm64-v8a/libkatago.so`、普通权重、HumanSL 权重、`gtp.cfg` 和 MD5 清单。由于当前没有连接 arm64 真机/模拟器，尚未验证实际设备上的进程执行和触摸体验；这一步需要在 Android 10+ arm64 真机上安装 APK 后完成。
 
 每次执行 `assembleDebug` 后还会自动生成一份带北京时间戳的副本，例如：
 
 ```
-app/build/outputs/apk/debug/sologo_20261017_215210.apk
+app/build/outputs/apk/debug/sologo_20261018_150746.apk
 ```
 
 原始 `app-debug.apk` 仍保留，Android Studio 的 Run/Install 流程不受影响。`assembleRelease` 也会在 release 目录生成同样的 `sologo_日期_时间.apk`。
 
-SGF/棋盘逻辑通过小型 smoke test；官方 Windows Eigen 版 KataGo 也已用同一份模型和 cfg 实测 `name`、`boardsize`、`genmove`、`kata-analyze`、`printsgf`、`final_score`，说明模型和配置格式有效。
+SGF/棋盘逻辑通过小型 smoke test；官方 Windows Eigen 版 KataGo 也已实测普通模型和 HumanSL 模型加载、`humanSLProfile=rank_5k`、`genmove` 与 GTP 参数设置，说明资源格式和运行时参数有效。
 
 ## 内购配置
 

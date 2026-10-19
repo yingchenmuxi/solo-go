@@ -62,6 +62,21 @@ class KataGoInstaller(
             expectedMd5 = expected["model.md5"],
             largeFile = true
         )
+        // HumanSL 是可选的大模型；存在时安装为 -human-model，不存在时仍可退化为普通对局。
+        val humanAsset = config.humanModelAsset?.let { preferred ->
+            findAssetOrNull(
+                preferred,
+                listOf("human-model.bin", "human-model.bin.gz", "human*")
+            )
+        }
+        val humanModelFile = humanAsset?.let { asset ->
+            installAsset(
+                assetName = asset,
+                target = File(rootDir, "human-model.bin.gz"),
+                expectedMd5 = expected["human-model.md5"],
+                largeFile = true
+            )
+        }
 
         val native = File(appContext.applicationInfo.nativeLibraryDir, "libkatago.so")
         val binary: File
@@ -90,7 +105,7 @@ class KataGoInstaller(
                     "请在 app/src/main/jniLibs/arm64-v8a/ 放入 libkatago.so。"
             )
         }
-        InstalledEngine(binary, configFile, modelFile, rootDir, usedNative)
+        InstalledEngine(binary, configFile, modelFile, humanModelFile, rootDir, usedNative)
     }
 
     private fun readChecksums(): Map<String, String> {
@@ -106,6 +121,12 @@ class KataGoInstaller(
     }
 
     private fun findAsset(preferred: String, fallbackPatterns: List<String>): String {
+        return findAssetOrNull(preferred, fallbackPatterns) ?: throw KataGoException(
+            "assets 中缺少 ${config.assetDir}/$preferred。请把 KataGo 可执行文件、权重和 gtp.cfg 放入 assets/${config.assetDir}/。"
+        )
+    }
+
+    private fun findAssetOrNull(preferred: String, fallbackPatterns: List<String>): String? {
         if (assetExists(preferred)) return preferred
         val files = appContext.assets.list(config.assetDir).orEmpty()
         for (pattern in fallbackPatterns) {
@@ -118,9 +139,7 @@ class KataGoInstaller(
             }
             if (candidate != null) return "${config.assetDir}/$candidate"
         }
-        throw KataGoException(
-            "assets 中缺少 ${config.assetDir}/$preferred。请把 KataGo 可执行文件、权重和 gtp.cfg 放入 assets/${config.assetDir}/。"
-        )
+        return null
     }
 
     private fun assetExists(path: String): Boolean = runCatching {

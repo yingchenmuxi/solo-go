@@ -9,6 +9,7 @@ KataGo 资源放置说明
 
 权重与配置（本工程已经内置）：
   app/src/main/assets/katago/model.txt（gzip 内容，安装后改名为 model.txt.gz）
+  app/src/main/assets/katago/human-model.bin（gzip 的 HumanSL 权重，安装后改名为 human-model.bin.gz）
   app/src/main/assets/katago/gtp.cfg
 
 可选完整性校验：
@@ -17,6 +18,7 @@ KataGo 资源放置说明
     katago.md5=<libkatago.so 或 katago 的 MD5>
     model.md5=<权重文件 MD5>
     gtp-cfg.md5=<gtp.cfg MD5>
+    human-model.md5=<HumanSL 权重 MD5>
 
 APP 首次启动会流式复制权重到 filesDir，避免一次性读入几十/上百 MB 造成 OOM。
 请确认权重文件许可证允许随 APP 再分发。

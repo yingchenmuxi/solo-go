@@ -163,6 +163,7 @@ class GameViewModel(
             try {
                 engine.initialize()
                 engine.setPlayStyle(currentSettings.aiLevel.playStyle)
+                engine.setHumanProfile(currentSettings.aiLevel.humanProfile)
                 val effectiveVisits = currentSettings.aiLevel.visits
                 engine.newGame(resolvedSize, resolvedKomi, effectiveVisits)
                 _uiState.update {
@@ -424,6 +425,7 @@ class GameViewModel(
                 val current = settings.settings.first()
                 engine.initialize()
                 engine.setPlayStyle(current.aiLevel.playStyle)
+                engine.setHumanProfile(current.aiLevel.humanProfile)
                 val effectiveVisits = current.aiLevel.visits
                 engine.newGame(state.boardSize, state.komi, effectiveVisits)
                 state.moves.forEach { move ->

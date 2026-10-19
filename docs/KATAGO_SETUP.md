@@ -7,6 +7,7 @@
 ```
 app/src/main/jniLibs/arm64-v8a/libkatago.so
 app/src/main/assets/katago/model.txt   # gzip 文本权重，避免 AAPT 自动解压/改扩展名
+app/src/main/assets/katago/human-model.bin # gzip HumanSL 权重，约 99MB
 app/src/main/assets/katago/gtp.cfg
 app/src/main/assets/katago/checksums.properties
 ```
@@ -21,6 +22,7 @@ Android 10+ 对应用可写目录执行 ELF 有 W^X 限制。`filesDir` 是可�
 katago.md5=...
 model.md5=...
 gtp-cfg.md5=...
+human-model.md5=...
 ```
 
 本工程已经生成该文件；安装器会严格校验二进制、权重和 cfg。替换模型后必须同步更新 `model.md5`。
@@ -36,12 +38,13 @@ gtp-cfg.md5=...
 - `reportAnalysisWinratesAs` 与 UI 的黑棋视角约定一致。
 
 当前随包的 `gtp.cfg` 使用 `numSearchThreads=4`、`maxTime=2.0`、`maxVisits=120`；
-APP 端默认 60 visits，单步最多约 2 秒，并保留 42℃ 高温暂停保护。
+APP 端默认 5K profile、35 visits，单步最多约 2 秒，并保留 42℃ 高温暂停保护。
 
-`KataGoEngine` 还会根据设置页的“稳定/自然/多变”通过 `kata-set-param` 调整：
+`KataGoEngine` 会通过 `-human-model` 加载官方 HumanSL 权重，并用 `kata-set-param`
+设置 `humanSLProfile`（10K/5K/1K/1段/3段分别对应 `rank_10k` 等）及人类着法参数。
+没有 HumanSL 权重时仍可退回普通 KataGo。普通模型的备用参数包括：
 `chosenMoveTemperatureEarly`、`chosenMoveTemperature`、`chosenMoveTemperatureHalflife`、
 `chosenMoveTemperatureOnlyBelowProb`、`rootNumSymmetriesToSample` 和 `useLcbForSelection`。
-这能增加手机低 visits 下的着法变化，但不是 HumanSL 的段位/年代风格模仿。
 
 ## 崩溃排查
 

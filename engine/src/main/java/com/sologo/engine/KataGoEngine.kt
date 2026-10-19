@@ -46,6 +46,7 @@ class KataGoEngine(
     private var boardSize = 19
     private var visits = config.defaultVisits
     private var playStyle = PlayStyle.NATURAL
+    private var humanProfile = "rank_5k"
     private val _state = MutableStateFlow(EngineState.IDLE)
     val state: StateFlow<EngineState> = _state.asStateFlow()
     private val _lastError = MutableStateFlow<String?>(null)
@@ -58,9 +59,17 @@ class KataGoEngine(
             val resources = installer.install()
             installed = resources
             _state.value = EngineState.STARTING
+            val arguments = mutableListOf(
+                "gtp",
+                "-config", resources.config.absolutePath,
+                "-model", resources.model.absolutePath
+            )
+            resources.humanModel?.let {
+                arguments += listOf("-human-model", it.absolutePath)
+            }
             val client = GtpClient(
                 binary = resources.binary,
-                arguments = listOf("gtp", "-config", resources.config.absolutePath, "-model", resources.model.absolutePath),
+                arguments = arguments,
                 workDir = resources.workDir,
                 logger = { Log.d(TAG, it) }
             )
@@ -71,6 +80,7 @@ class KataGoEngine(
             client.command("clear_board", 15_000)
             setVisitsInternal(visits)
             setPlayStyleInternal(playStyle)
+            setHumanStyleInternal()
             _state.value = EngineState.READY
             _lastError.value = null
         } catch (t: Throwable) {
@@ -93,6 +103,7 @@ class KataGoEngine(
         client.command("clear_board")
         setVisitsInternal(visits)
         setPlayStyleInternal(playStyle)
+        setHumanStyleInternal()
     }
 
     /** 选择下法变化档位；引擎已启动时立即生效，下一局也会沿用。 */
@@ -100,6 +111,14 @@ class KataGoEngine(
         playStyle = style
         if (_state.value == EngineState.READY) {
             setPlayStyleInternal(style)
+        }
+    }
+
+    /** 设置 HumanSL 的人类水平 profile，例如 rank_10k / rank_1k / rank_3d。 */
+    suspend fun setHumanProfile(profile: String) {
+        humanProfile = profile
+        if (_state.value == EngineState.READY) {
+            setHumanStyleInternal()
         }
     }
 
@@ -198,7 +217,7 @@ class KataGoEngine(
 
     fun resourcesDescription(): String {
         val r = installed ?: return "资源未安装"
-        return "binary=${r.binary.name}, native=${r.usedNativeLibrary}, model=${r.model.name}"
+        return "binary=${r.binary.name}, native=${r.usedNativeLibrary}, model=${r.model.name}, human=${r.humanModel?.name ?: "none"}"
     }
 
     private suspend fun ensureReady() {
@@ -223,6 +242,27 @@ class KataGoEngine(
         )
         params.forEach { (key, value) ->
             // 参数兼容性按 KataGo 版本处理；不支持时保留默认值，不影响对局。
+            runCatching { gtp!!.command("kata-set-param $key $value", 10_000) }
+        }
+    }
+
+    private suspend fun setHumanStyleInternal() {
+        // 没有 HumanSL 权重时保持普通 KataGo 行为。
+        if (installed?.humanModel == null) return
+        val params = listOf(
+            "humanSLProfile" to humanProfile,
+            "humanSLChosenMoveProp" to 1.0,
+            "humanSLChosenMoveIgnorePass" to true,
+            "humanSLChosenMovePiklLambda" to 100000000,
+            "chosenMoveTemperatureEarly" to 0.85,
+            "chosenMoveTemperature" to 0.70,
+            "chosenMoveTemperatureHalflife" to 80,
+            "chosenMoveTemperatureOnlyBelowProb" to 0.01,
+            "rootNumSymmetriesToSample" to 2,
+            "useLcbForSelection" to false,
+            "ignorePreRootHistory" to false
+        )
+        params.forEach { (key, value) ->
             runCatching { gtp!!.command("kata-set-param $key $value", 10_000) }
         }
     }

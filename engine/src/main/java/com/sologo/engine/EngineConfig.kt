@@ -17,6 +17,7 @@ data class EngineConfig(
     // 资产文件故意不用 .gz 后缀：AAPT 会自动解压 .gz 并改写文件名。
     // 这里保存的是 gzip 压缩的文本权重，安装到 filesDir 时再改名为 model.txt.gz。
     val modelAsset: String = "katago/model.txt",
+    val humanModelAsset: String? = "katago/human-model.bin",
     val checksumsAsset: String = "katago/checksums.properties",
     // 默认偏速度：b6c96 小模型 + 4 线程下，60 visits 通常能在一两秒内落子。
     val defaultVisits: Int = 60,
@@ -31,6 +32,7 @@ data class InstalledEngine(
     val binary: java.io.File,
     val config: java.io.File,
     val model: java.io.File,
+    val humanModel: java.io.File?,
     val workDir: java.io.File,
     val usedNativeLibrary: Boolean
 )

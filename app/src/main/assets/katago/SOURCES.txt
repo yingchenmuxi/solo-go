@@ -28,3 +28,12 @@ SoloGo KataGo 资源来源与校验
    说明：选择 5MB 左右的官方 kata1 小网络，优先保证手机 CPU 的启动速度和发热表现；
    它不是当前最强网络，但足以用于基础人机对弈和本地学习复盘。若要提升棋力，
    可替换为同目录下更新的 .bin.gz/.txt.gz 网络，并同步更新 checksums.properties。
+
+4. HumanSL 人类风格权重
+   文件：app/src/main/assets/katago/human-model.bin（内容为 gzip 权重）
+   来源：https://github.com/lightvector/KataGo/releases/tag/v1.15.0
+   原始文件：b18c384nbt-humanv0.bin.gz
+   大小：99,066,230 字节
+   SHA256：637746e44f0efe00ad1245a50aa9bbf0716efe364c43965ead97bd6835d84ab5
+   MD5：dc7ce241411b05ef2a5416d6406313a4
+   用途：通过 KataGo 的 -human-model 参数结合 rank_* profile 模仿人类水平。
