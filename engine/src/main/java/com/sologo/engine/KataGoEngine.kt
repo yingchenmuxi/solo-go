@@ -10,6 +10,7 @@ import com.sologo.core.model.HandicapStones
 import com.sologo.core.model.PlayStyle
 import com.sologo.core.model.PositionAnalysis
 import com.sologo.core.model.StoneColor
+import com.sologo.core.model.normalizeOwnershipToBlack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -206,7 +207,8 @@ class KataGoEngine(
     }
 
     /**
-     * 对一个局面做短时分析。返回的 ownership 为 KataGo 原始顺序（从上到下、从左到右）。
+     * 对一个局面做短时分析。返回的 ownership 为从上到下、从左到右的黑方视角值
+     * （正数黑、负数白）；KataGo 原始输出是以当前行棋方为正方向，这里已统一翻转。
      */
     suspend fun analyze(
         maxVisits: Int = visits,
@@ -360,7 +362,7 @@ class KataGoEngine(
                         tokens[i].toFloatOrNull()?.let(values::add)
                         i++
                     }
-                    ownership = values
+                    ownership = normalizeOwnershipToBlack(values, turn)
                     continue
                 }
                 else -> Unit

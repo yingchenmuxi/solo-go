@@ -41,6 +41,13 @@ data class PositionAnalysis(
 }
 
 /**
+ * KataGo 的 ownership 以“当前行棋方”为正方向。
+ * App 内部统一使用黑方视角：正数黑、负数白。
+ */
+fun normalizeOwnershipToBlack(values: List<Float>, turn: StoneColor): List<Float> =
+    if (turn == StoneColor.WHITE) values.map { -it } else values
+
+/**
  * 单手价值分析。loss 是“如果下这手，黑棋胜率相对上一手最佳点的下降”。
  * 负值表示黑棋实际下得比最佳点更好（通常出现在白棋视角的转换里）。
  */

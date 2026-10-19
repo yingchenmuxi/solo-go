@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -26,7 +27,7 @@ import kotlin.math.roundToInt
  * Compose Canvas 棋盘。
  *
  * 这个组件只做绘制和把触摸点换算成交叉点，不包含任何围棋规则。
- * ownership 为 KataGo 的黑棋视角领地值（正数黑、负数白），用于热力色块。
+ * ownership 为引擎统一转换后的黑棋视角领地值（正数黑、负数白），用于势力色块。
  */
 @Composable
 fun GoBoard(
@@ -72,7 +73,8 @@ fun GoBoard(
             )
         )
 
-        // 领地热力层放在格线下面、棋子上面，效果更像 KataGo 的分析图。
+        // 势力层放在格线下面、棋子上面。蓝色表示黑方影响，红色表示白方影响，
+        // 颜色深浅跟随 ownership 的置信度，便于同时看清边界和确定区域。
         if (showOwnership && ownership.size >= boardSize * boardSize) {
             for (y in 0 until boardSize) {
                 for (x in 0 until boardSize) {
@@ -80,14 +82,13 @@ fun GoBoard(
                     if (abs(value) < 0.08f) continue
                     val center = point(x, y)
                     val half = cell * 0.46f
-                    drawRect(
-                        color = if (value > 0) {
-                            Color(0xFF101820).copy(alpha = (abs(value) * 0.36f).coerceAtMost(0.36f))
-                        } else {
-                            Color.White.copy(alpha = (abs(value) * 0.45f).coerceAtMost(0.45f))
-                        },
+                    val strength = abs(value).coerceIn(0f, 1f)
+                    val color = if (value > 0) TerritoryBlackColor else TerritoryWhiteColor
+                    drawRoundRect(
+                        color = color.copy(alpha = 0.12f + strength * 0.34f),
                         topLeft = Offset(center.x - half, center.y - half),
-                        size = Size(half * 2f, half * 2f)
+                        size = Size(half * 2f, half * 2f),
+                        cornerRadius = CornerRadius(cell * 0.16f)
                     )
                 }
             }
@@ -243,3 +244,7 @@ private fun starPoints(boardSize: Int): List<Pair<Int, Int>> {
 }
 
 private const val BOARD_MARGIN_RATIO = 0.09f
+
+/** 与局势面板图例共用，避免棋盘颜色和说明颜色不一致。 */
+val TerritoryBlackColor = Color(0xFF1565C0)
+val TerritoryWhiteColor = Color(0xFFE53935)

@@ -15,6 +15,7 @@ import com.sologo.core.model.HandicapStones
 import com.sologo.core.model.MoveRecord
 import com.sologo.core.model.PositionAnalysis
 import com.sologo.core.model.StoneColor
+import com.sologo.core.model.TerritorySummary
 import com.sologo.engine.BatteryTemperatureMonitor
 import com.sologo.engine.EngineState
 import com.sologo.engine.KataGoEngine
@@ -54,6 +55,7 @@ data class GameUiState(
     val analysis: PositionAnalysis? = null,
     val candidates: List<CandidateMove> = emptyList(),
     val ownership: List<Float> = emptyList(),
+    val territory: TerritorySummary? = null,
     val winrate: Double? = null,
     val scoreLead: Double? = null,
     val batteryTemp: Float? = null,
@@ -178,6 +180,7 @@ class GameViewModel(
                     analysis = null,
                     candidates = emptyList(),
                     ownership = emptyList(),
+                    territory = null,
                     winrate = null,
                     scoreLead = null
                 )
@@ -299,6 +302,7 @@ class GameViewModel(
                         analysis = null,
                         candidates = emptyList(),
                         ownership = emptyList(),
+                        territory = null,
                         winrate = null,
                         scoreLead = null
                     )
@@ -331,6 +335,11 @@ class GameViewModel(
                     durationMs = 700,
                     turn = _uiState.value.turn
                 )
+                val summary = TerritorySummary.fromOwnership(
+                    ownership = analysis.ownership,
+                    boardSize = _uiState.value.boardSize,
+                    komi = _uiState.value.komi
+                )
                 _uiState.update {
                     it.copy(
                         status = "分析完成（${analysis.visits} visits）",
@@ -338,12 +347,25 @@ class GameViewModel(
                         analysis = analysis,
                         candidates = analysis.candidates,
                         ownership = analysis.ownership,
+                        territory = summary,
+                        scoreLead = summary?.lead ?: analysis.blackScoreLead,
                         winrate = analysis.blackWinrate,
-                        scoreLead = analysis.blackScoreLead
                     )
                 }
             } catch (t: Throwable) {
-                _uiState.update { it.copy(status = "分析失败", error = t.message) }
+                _uiState.update {
+                    it.copy(
+                        status = "分析失败",
+                        error = t.message,
+                        analysisVisible = false,
+                        analysis = null,
+                        candidates = emptyList(),
+                        ownership = emptyList(),
+                        territory = null,
+                        winrate = null,
+                        scoreLead = null
+                    )
+                }
             }
         }
     }
@@ -366,6 +388,7 @@ class GameViewModel(
                     analysis = null,
                     candidates = emptyList(),
                     ownership = emptyList(),
+                    territory = null,
                     winrate = null,
                     scoreLead = null,
                     status = "AI 分析已关闭"
@@ -587,6 +610,7 @@ class GameViewModel(
                 analysis = null,
                 candidates = emptyList(),
                 ownership = emptyList(),
+                territory = null,
                 winrate = null,
                 scoreLead = null,
                 status = if (color == it.humanColor) "KataGo 正在思考…" else "轮到你落子"
@@ -609,6 +633,11 @@ class GameViewModel(
                     durationMs = 450,
                     turn = _uiState.value.turn
                 )
+                val summary = TerritorySummary.fromOwnership(
+                    ownership = analysis.ownership,
+                    boardSize = _uiState.value.boardSize,
+                    komi = _uiState.value.komi
+                )
                 _uiState.update {
                     it.copy(
                         busy = false,
@@ -616,8 +645,9 @@ class GameViewModel(
                         analysis = analysis,
                         candidates = analysis.candidates,
                         ownership = analysis.ownership,
+                        territory = summary,
+                        scoreLead = summary?.lead ?: analysis.blackScoreLead,
                         winrate = analysis.blackWinrate,
-                        scoreLead = analysis.blackScoreLead,
                         status = "轮到你落子"
                     )
                 }

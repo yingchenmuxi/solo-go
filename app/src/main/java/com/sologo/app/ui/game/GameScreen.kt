@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,8 +12,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.background
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
@@ -35,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,6 +51,8 @@ import androidx.lifecycle.ViewModelProvider
 import com.sologo.app.AppContainer
 import com.sologo.app.ui.components.GoBoard
 import com.sologo.app.ui.components.PaywallDialog
+import com.sologo.app.ui.components.TerritoryBlackColor
+import com.sologo.app.ui.components.TerritoryWhiteColor
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -124,10 +130,18 @@ fun GameScreen(
                     modifier = Modifier.weight(1f)
                 ) { Text("停一手") }
                 Button(
-                    onClick = vm::analyzeNow,
+                    onClick = vm::toggleAnalysis,
                     enabled = !state.busy && !state.gameOver,
                     modifier = Modifier.weight(1f)
-                ) { Text(if (state.advancedAccess) "局势分析" else "解锁分析") }
+                ) {
+                    Text(
+                        when {
+                            !state.advancedAccess -> "解锁分析"
+                            state.analysisVisible -> "关闭分析"
+                            else -> "局势分析"
+                        }
+                    )
+                }
             }
             if (state.analysisVisible && state.analysis != null) {
                 SituationPanel(state)
@@ -338,10 +352,45 @@ private fun SituationPanel(state: GameUiState) {
             Text("局势分析", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
             Text(
                 "黑胜率 ${(best.winrate * 100).formatPercent()} · " +
-                    "目数差 ${if (best.scoreLead >= 0) "+" else ""}${"%.1f".format(best.scoreLead)} · " +
                     "最佳点 $bestCoordinate",
                 style = MaterialTheme.typography.labelSmall
             )
+            val territory = state.territory
+            if (territory != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TerritoryLegendItem(
+                        color = TerritoryBlackColor,
+                        text = "黑势力 ${territory.blackArea.formatScore()} 目"
+                    )
+                    TerritoryLegendItem(
+                        color = TerritoryWhiteColor,
+                        text = "白势力 ${territory.whiteArea.formatScore()} 目"
+                    )
+                }
+                Text(
+                    text = if (territory.isEven) {
+                        "贴目 ${territory.komi.formatScore()}（白）· 双方持平"
+                    } else if (territory.lead > 0) {
+                        "贴目 ${territory.komi.formatScore()}（白）· " +
+                            "黑领先 ${territory.lead.formatScore()} 目"
+                    } else {
+                        "贴目 ${territory.komi.formatScore()}（白）· " +
+                            "白领先 ${(-territory.lead).formatScore()} 目"
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            } else {
+                Text(
+                    text = "目数差 ${if (best.scoreLead >= 0) "+" else ""}" +
+                        "${best.scoreLead.formatScore()}",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
             if (best.pv.isNotEmpty()) {
                 val pv = best.pv.take(5).joinToString(" ") {
                     "${columns[it.x]}${state.boardSize - it.y}"
@@ -357,6 +406,25 @@ private fun SituationPanel(state: GameUiState) {
         }
     }
 }
+
+@Composable
+private fun TerritoryLegendItem(color: Color, text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(color.copy(alpha = 0.75f))
+        )
+        Text(text, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+private fun Float.formatScore(): String = "%.1f".format(this)
+
+private fun Double.formatScore(): String = "%.1f".format(this)
 
 private fun Double.formatPercent(): String =
     if (this >= 100.0) "100.0%" else "%.1f%%".format(this)
