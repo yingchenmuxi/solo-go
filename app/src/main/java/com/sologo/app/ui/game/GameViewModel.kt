@@ -1,5 +1,6 @@
 package com.sologo.app.ui.game
 
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sologo.app.data.SettingsRepository
@@ -37,6 +38,7 @@ data class GameUiState(
     val moves: List<MoveRecord> = emptyList(),
     val status: String = "准备开始",
     val busy: Boolean = true,
+    val lastAiSeconds: Int? = null,
     val started: Boolean = false,
     val gameOver: Boolean = false,
     val advancedAccess: Boolean = false,
@@ -149,6 +151,7 @@ class GameViewModel(
                     moves = emptyList(),
                     started = true,
                     gameOver = false,
+                    lastAiSeconds = null,
                     autoAnalyzeEnabled = currentSettings.autoAnalyze,
                     analysisVisible = false,
                     analysis = null,
@@ -249,6 +252,7 @@ class GameViewModel(
                         moves = moves,
                         turn = state.humanColor,
                         gameOver = false,
+                        lastAiSeconds = null,
                         status = "已悔棋，请重新落子",
                         analysis = null,
                         candidates = emptyList(),
@@ -462,9 +466,19 @@ class GameViewModel(
             return
         }
         val aiColor = state.humanColor.opponent
-        _uiState.update { it.copy(busy = true, turn = aiColor, status = "KataGo 正在思考…") }
+        val thinkingStartedAt = SystemClock.elapsedRealtime()
+        _uiState.update {
+            it.copy(
+                busy = true,
+                lastAiSeconds = null,
+                turn = aiColor,
+                status = "KataGo 正在思考…"
+            )
+        }
         try {
             val generated = engine.genmove(aiColor)
+            val elapsedSeconds = ((SystemClock.elapsedRealtime() - thinkingStartedAt) / 1_000).toInt()
+            _uiState.update { it.copy(lastAiSeconds = elapsedSeconds) }
             if (generated.resigned) {
                 _uiState.update {
                     it.copy(busy = false, gameOver = true, status = "KataGo 认输，你赢了")
@@ -493,8 +507,14 @@ class GameViewModel(
                 }
             }
         } catch (t: Throwable) {
+            val elapsedSeconds = ((SystemClock.elapsedRealtime() - thinkingStartedAt) / 1_000).toInt()
             _uiState.update {
-                it.copy(busy = false, status = "AI 落子失败", error = t.message)
+                it.copy(
+                    busy = false,
+                    lastAiSeconds = elapsedSeconds,
+                    status = "AI 落子失败",
+                    error = t.message
+                )
             }
             _events.tryEmit(GameEvent.Message("AI 落子失败: ${t.message ?: "未知错误"}"))
         }

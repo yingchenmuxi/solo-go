@@ -15,7 +15,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -55,35 +54,22 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("对局设置", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "棋盘大小、执子颜色、贴目和 AI 等级已移到首页“开始人机对局”上方。",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("AI 分析", style = MaterialTheme.typography.titleMedium)
+                    Text("AI 分析", style = MaterialTheme.typography.titleSmall)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                     ) {
                         Text(
                             "每次 AI 落子后自动分析",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.labelLarge,
                             modifier = Modifier.weight(1f)
                         )
                         FilterChip(
@@ -93,7 +79,7 @@ fun SettingsScreen(
                         )
                     }
                     Text(
-                        "AI 等级会自动决定搜索量、思考时间和着法温度，无需再手动调参数。",
+                        "自动分析由首页 AI 等级控制。",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -102,15 +88,15 @@ fun SettingsScreen(
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("高级复盘", style = MaterialTheme.typography.titleMedium)
+                    Text("高级复盘", style = MaterialTheme.typography.titleSmall)
                     Text(
                         if (FeatureFlags.unlockAllForTesting) "测试模式：全部高级功能已开放，release 恢复付费门禁。"
                         else if (settings.premiumUnlocked) "已买断，永久解锁。"
                         else "未解锁",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.labelLarge
                     )
                     if (!FeatureFlags.unlockAllForTesting && !settings.premiumUnlocked) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -133,18 +119,18 @@ fun SettingsScreen(
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Text("关于与合规", style = MaterialTheme.typography.titleMedium)
-                    HorizontalDivider()
-                    TextButton(onClick = onOpenPrivacy) { Text("隐私政策") }
-                    TextButton(onClick = onOpenAbout) { Text("关于 SoloGo / KataGo 开源协议") }
-                    Text(
-                        "本 APP 为教育/工具类单机围棋学习工具，不提供联网对战，不申请通讯录、定位等无关权限。",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("关于与合规", style = MaterialTheme.typography.titleSmall)
+                    TextButton(
+                        onClick = onOpenPrivacy,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                    ) { Text("隐私政策") }
+                    TextButton(
+                        onClick = onOpenAbout,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                    ) { Text("关于 SoloGo / KataGo") }
                 }
             }
         }

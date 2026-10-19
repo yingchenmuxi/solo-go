@@ -37,7 +37,7 @@ human-model.md5=...
 - `logDir` 指向应用可写目录，或关闭文件日志，避免权限问题；
 - `reportAnalysisWinratesAs` 与 UI 的黑棋视角约定一致。
 
-当前随包的 `gtp.cfg` 使用 `numSearchThreads=4`、`maxTime=2.0`、`maxVisits=120`；
+当前随包的 `gtp.cfg` 使用 `numSearchThreads=4`、`maxTime=1.5`、`maxVisits=120`；
 APP 端默认 5K profile、15 visits，单步最多约 2 秒，并保留 42℃ 高温暂停保护。
 
 `KataGoEngine` 会通过 `-human-model` 加载官方 HumanSL 权重，并用 `kata-set-param`

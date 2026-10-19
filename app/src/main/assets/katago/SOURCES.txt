@@ -14,8 +14,8 @@ SoloGo KataGo 资源来源与校验
    文件：app/src/main/assets/katago/gtp.cfg
    来源：https://github.com/ChuiShui233/KataGO_Android
    路径：KataGO_Android/app/src/main/assets/gtp.cfg
-   SHA256：4219fe6867f01f6ad03718cc4eed3f78c4e5ed81defd8ddc5402c508ded46b03
-   修改：numSearchThreads=4、maxTime=2.0、maxVisits=120，优先降低单步等待时间，
+   SHA256：59c1e060a6f869af901718b93a3e0d4c8f6934dd544b3b7a831264fe371edb18
+   修改：numSearchThreads=4、maxTime=1.5、maxVisits=120，优先降低单步等待时间，
    同时保留 APP 端 42℃ 高温暂停保护。
 
 3. 神经网络权重

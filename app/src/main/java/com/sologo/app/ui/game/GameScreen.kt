@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -98,16 +99,7 @@ fun GameScreen(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            StatusCard(state, billingState.priceText, vm::toggleAnalysis)
-            if (state.highTemp) {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "电池温度超过 42℃，AI 搜索已自动暂停以保护设备。温度降下来后可以继续。",
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                }
-            }
+            CompactGameHeader(state, billingState.priceText, vm::toggleAnalysis)
             GoBoard(
                 position = state.board,
                 enabled = !state.busy && !state.gameOver && !state.highTemp &&
@@ -116,9 +108,6 @@ fun GameScreen(
                 showOwnership = state.analysisVisible && state.ownership.isNotEmpty(),
                 candidates = if (state.analysisVisible) state.candidates else emptyList(),
                 onIntersectionTap = vm::onBoardTap
-            )
-            AiThinkingTimer(
-                active = state.busy && state.turn != state.humanColor
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -169,17 +158,7 @@ fun GameScreen(
             if (state.analysisVisible && state.candidates.isNotEmpty()) {
                 CandidatePanel(state)
             }
-            state.error?.let { error ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "错误：$error",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
         }
     }
 
@@ -200,7 +179,7 @@ fun GameScreen(
 }
 
 @Composable
-private fun AiThinkingTimer(active: Boolean) {
+private fun AiThinkingTimer(active: Boolean, lastSeconds: Int?) {
     var seconds by remember { mutableStateOf(0) }
     LaunchedEffect(active) {
         seconds = 0
@@ -211,26 +190,24 @@ private fun AiThinkingTimer(active: Boolean) {
             }
         }
     }
-    if (active) {
-        Text(
-            text = "AI 思考中 · ${seconds}s",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
+    val shownSeconds = if (active) seconds else (lastSeconds ?: 0)
+    Text(
+        text = if (active) "AI 思考 ${shownSeconds}s" else "AI 用时 ${shownSeconds}s",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.primary
+    )
 }
 
 @Composable
-private fun StatusCard(
+private fun CompactGameHeader(
     state: GameUiState,
     priceText: String,
     onToggleAnalysis: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -238,27 +215,31 @@ private fun StatusCard(
             ) {
                 Text(
                     text = state.status,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                Text(
-                    text = "${state.boardSize} 路 · 贴目 ${state.komi}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                AiThinkingTimer(
+                    active = state.busy && state.turn != state.humanColor,
+                    lastSeconds = state.lastAiSeconds
                 )
             }
-            HorizontalDivider()
             Row(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "你执${if (state.humanColor.name == "BLACK") "黑" else "白"} · 第 ${state.moves.size} 手",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "你执${if (state.humanColor.name == "BLACK") "黑" else "白"} · " +
+                        "第 ${state.moves.size} 手 · ${state.boardSize}路 · 贴目 ${state.komi}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
                 state.batteryTemp?.let {
                     Text(
                         text = "电池 ${"%.1f".format(it)}℃",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = if (state.highTemp) MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -267,28 +248,23 @@ private fun StatusCard(
             if (state.advancedAccess) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text(
-                        text = state.winrate?.let { "黑胜率 ${(it * 100).formatPercent()}" } ?: "黑胜率 --",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                        text = state.scoreLead?.let { "目数差 ${if (it >= 0) "+" else ""}${"%.1f".format(it)}" } ?: "目数差 --",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "AI 分析：${if (state.analysisVisible) "开" else "关"}",
-                        style = MaterialTheme.typography.bodySmall,
+                        text = state.winrate?.let { "黑胜率 ${(it * 100).formatPercent()}" } ?: "黑胜率 --",
+                        style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.weight(1f)
                     )
-                    TextButton(onClick = onToggleAnalysis) {
-                        Text(if (state.analysisVisible) "关闭分析" else "开启分析")
+                    Text(
+                        text = state.scoreLead?.let { "目数差 ${if (it >= 0) "+" else ""}${"%.1f".format(it)}" } ?: "目数差 --",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = onToggleAnalysis, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+                        Text(
+                            if (state.analysisVisible) "分析关" else "分析开",
+                            style = MaterialTheme.typography.labelSmall
+                        )
                     }
                 }
             } else {
@@ -296,6 +272,22 @@ private fun StatusCard(
                     text = "高级复盘未解锁 · $priceText 买断解锁",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (state.highTemp) {
+                Text(
+                    text = "温度超过 42℃，AI 搜索已暂停",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+            state.error?.let { error ->
+                Text(
+                    text = "错误：$error",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
