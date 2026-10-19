@@ -5,6 +5,7 @@ import android.util.Log
 import com.sologo.core.model.CandidateMove
 import com.sologo.core.model.GoCoordinates
 import com.sologo.core.model.GoPoint
+import com.sologo.core.model.HandicapStones
 import com.sologo.core.model.PlayStyle
 import com.sologo.core.model.PositionAnalysis
 import com.sologo.core.model.StoneColor
@@ -93,7 +94,12 @@ class KataGoEngine(
         }
     }
 
-    suspend fun newGame(size: Int, komi: Float, maxVisits: Int = visits) {
+    suspend fun newGame(
+        size: Int,
+        komi: Float,
+        maxVisits: Int = visits,
+        handicap: Int = 0
+    ) {
         require(size in 2..19) { "不支持的棋盘大小: $size" }
         ensureReady()
         val client = gtp ?: throw EngineNotReadyException()
@@ -102,6 +108,14 @@ class KataGoEngine(
         client.command("boardsize $size")
         client.command("komi $komi")
         client.command("clear_board")
+        if (handicap > 0) {
+            val points = HandicapStones.points(size, handicap)
+            if (points.size != handicap) {
+                throw KataGoException("棋盘 $size 路不支持 $handicap 子让子")
+            }
+            val coordinates = points.joinToString(" ") { GoCoordinates.toGtp(it, size) }
+            client.command("set_free_handicap $coordinates")
+        }
         setVisitsInternal(visits)
         setPlayStyleInternal(playStyle)
         setHumanStyleInternal()

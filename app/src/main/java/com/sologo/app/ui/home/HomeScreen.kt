@@ -52,22 +52,23 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         "和 KataGo 下一盘",
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "本地离线运行，不联网也能对弈。基础对局永久免费；高级胜率、目数、领地和整盘复盘可按需解锁。",
-                        style = MaterialTheme.typography.bodyMedium
+                        "本地离线运行 · 基础对局免费 · 高级分析可解锁",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text("AI 水平（近似）", style = MaterialTheme.typography.labelLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -84,30 +85,47 @@ fun HomeScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text("棋盘", style = MaterialTheme.typography.labelLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                    ) {
+                        Text("棋盘", style = MaterialTheme.typography.labelSmall)
                         listOf(9, 13, 19).forEach { size ->
                             FilterChip(
                                 selected = settings.boardSize == size,
                                 onClick = { vm.setBoardSize(size) },
-                                label = { Text("${size} 路") }
+                                label = { Text("$size") }
                             )
                         }
-                    }
-                    Text("执子", style = MaterialTheme.typography.labelLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("执子", style = MaterialTheme.typography.labelSmall)
                         FilterChip(
                             selected = settings.humanColor == StoneColor.BLACK,
                             onClick = { vm.setHumanColor(StoneColor.BLACK) },
-                            label = { Text("执黑") }
+                            label = { Text("黑") }
                         )
                         FilterChip(
                             selected = settings.humanColor == StoneColor.WHITE,
+                            enabled = settings.handicap == 0,
                             onClick = { vm.setHumanColor(StoneColor.WHITE) },
-                            label = { Text("执白") }
+                            label = { Text("白") }
                         )
                     }
-                    Text("贴目：${settings.komi}", style = MaterialTheme.typography.labelLarge)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                    ) {
+                        Text("让子", style = MaterialTheme.typography.labelSmall)
+                        listOf(0, 2, 3, 4, 5).forEach { stones ->
+                            FilterChip(
+                                selected = settings.handicap == stones,
+                                onClick = { vm.setHandicap(stones) },
+                                label = { Text(if (stones == 0) "无" else "$stones") }
+                            )
+                        }
+                    }
+                    Text("贴目：${settings.komi}", style = MaterialTheme.typography.labelSmall)
                     Slider(
                         value = settings.komi,
                         onValueChange = { vm.setKomi((it * 2).roundToInt() / 2f) },
@@ -122,8 +140,8 @@ fun HomeScreen(
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text("继续学习", style = MaterialTheme.typography.titleMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -142,8 +160,8 @@ fun HomeScreen(
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text("合规与安全", style = MaterialTheme.typography.titleMedium)
                     Text(

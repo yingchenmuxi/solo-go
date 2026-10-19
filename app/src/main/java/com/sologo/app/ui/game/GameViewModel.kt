@@ -9,6 +9,7 @@ import com.sologo.core.model.BoardPosition
 import com.sologo.core.model.CandidateMove
 import com.sologo.core.model.GameRecord
 import com.sologo.core.model.GoPoint
+import com.sologo.core.model.HandicapStones
 import com.sologo.core.model.MoveRecord
 import com.sologo.core.model.PositionAnalysis
 import com.sologo.core.model.StoneColor
@@ -32,6 +33,8 @@ import java.io.File
 data class GameUiState(
     val boardSize: Int = 19,
     val komi: Float = 7.5f,
+    val handicap: Int = 0,
+    val setupBlack: List<GoPoint> = emptyList(),
     val humanColor: StoneColor = StoneColor.BLACK,
     val board: BoardPosition = BoardPosition.empty(19),
     val turn: StoneColor = StoneColor.BLACK,
@@ -137,7 +140,14 @@ class GameViewModel(
             val currentSettings = settings.settings.first()
             val resolvedSize = size ?: currentSettings.boardSize
             val resolvedKomi = komi ?: currentSettings.komi
-            val resolvedHumanColor = humanColor ?: currentSettings.humanColor
+            val resolvedHandicap = currentSettings.handicap.coerceIn(0, 9)
+            // 让子棋默认由人类执黑，AI 执白。
+            val resolvedHumanColor = if (resolvedHandicap > 0) {
+                StoneColor.BLACK
+            } else {
+                humanColor ?: currentSettings.humanColor
+            }
+            val setupPoints = HandicapStones.points(resolvedSize, resolvedHandicap)
             _uiState.update {
                 it.copy(
                     busy = true,
@@ -145,8 +155,14 @@ class GameViewModel(
                     error = null,
                     boardSize = resolvedSize,
                     komi = resolvedKomi,
+                    handicap = resolvedHandicap,
+                    setupBlack = setupPoints,
                     humanColor = resolvedHumanColor,
-                    board = BoardPosition.empty(resolvedSize),
+                    board = BoardPosition.fromSetup(
+                        size = resolvedSize,
+                        black = setupPoints.toSet(),
+                        white = emptySet()
+                    ),
                     turn = StoneColor.BLACK,
                     moves = emptyList(),
                     started = true,
@@ -162,15 +178,28 @@ class GameViewModel(
                 )
             }
             positionHistory.clear()
-            positionHistory.add(BoardPosition.empty(resolvedSize))
+            positionHistory.add(
+                BoardPosition.fromSetup(
+                    size = resolvedSize,
+                    black = setupPoints.toSet(),
+                    white = emptySet()
+                )
+            )
             try {
                 engine.initialize()
                 engine.setPlayStyle(currentSettings.aiLevel.playStyle)
                 engine.setHumanProfile(currentSettings.aiLevel.humanProfile)
                 val effectiveVisits = currentSettings.aiLevel.visits
-                engine.newGame(resolvedSize, resolvedKomi, effectiveVisits)
+                engine.newGame(resolvedSize, resolvedKomi, effectiveVisits, resolvedHandicap)
                 _uiState.update {
-                    it.copy(busy = false, status = "你执${resolvedHumanColor.chineseName}，请落子")
+                    it.copy(
+                        busy = false,
+                        status = if (resolvedHandicap > 0) {
+                            "让 $resolvedHandicap 子，你执黑，请落子"
+                        } else {
+                            "你执${resolvedHumanColor.chineseName}，请落子"
+                        }
+                    )
                 }
                 if (resolvedHumanColor == StoneColor.WHITE) {
                     maybeAiMove()
@@ -282,7 +311,7 @@ class GameViewModel(
         analysisJob = viewModelScope.launch {
             _uiState.update { it.copy(analysisVisible = true, status = "KataGo 思考中…") }
             try {
-                val visits = settings.settings.first().aiLevel.analysisVisits
+                val visits = settings.settings.first().aiLevel.visits.coerceAtLeast(20)
                 val analysis = engine.analyze(
                     maxVisits = visits,
                     intervalMs = 300,
@@ -357,6 +386,8 @@ class GameViewModel(
                 val record = GameRecord(
                     size = state.boardSize,
                     komi = state.komi,
+                    handicap = state.handicap,
+                    setupBlack = state.setupBlack,
                     moves = state.moves,
                     result = if (state.gameOver) "已结束" else ""
                 )
@@ -431,7 +462,7 @@ class GameViewModel(
                 engine.setPlayStyle(current.aiLevel.playStyle)
                 engine.setHumanProfile(current.aiLevel.humanProfile)
                 val effectiveVisits = current.aiLevel.visits
-                engine.newGame(state.boardSize, state.komi, effectiveVisits)
+                engine.newGame(state.boardSize, state.komi, effectiveVisits, state.handicap)
                 state.moves.forEach { move ->
                     if (!move.comment.contains("认输")) {
                         engine.play(move.color, move.point)
@@ -553,7 +584,7 @@ class GameViewModel(
             }
             try {
                 val analysis = engine.analyze(
-                    maxVisits = settings.settings.first().aiLevel.analysisVisits,
+                    maxVisits = settings.settings.first().aiLevel.visits.coerceAtLeast(20),
                     intervalMs = 300,
                     durationMs = 450,
                     turn = _uiState.value.turn

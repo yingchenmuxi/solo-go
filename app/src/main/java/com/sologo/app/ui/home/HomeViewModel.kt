@@ -28,11 +28,17 @@ class HomeViewModel(
         container.settings.setKomi(value)
     }
 
+    fun setHandicap(value: Int) = viewModelScope.launch {
+        container.settings.setHandicap(value)
+        if (value > 0) container.settings.setHumanColor(StoneColor.BLACK)
+    }
+
     fun setAiLevel(value: AiLevel) = viewModelScope.launch {
         container.settings.setAiLevel(value)
     }
 
     fun setHumanColor(value: StoneColor) = viewModelScope.launch {
         container.settings.setHumanColor(value)
+        if (value == StoneColor.WHITE) container.settings.setHandicap(0)
     }
 }

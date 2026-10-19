@@ -25,6 +25,7 @@ data class AppSettings(
     val premiumUnlocked: Boolean = false,
     val boardSize: Int = 19,
     val komi: Float = 7.5f,
+    val handicap: Int = 0,
     val aiLevel: AiLevel = AiLevel.DEFAULT,
     val autoAnalyze: Boolean = false,
     val humanColor: StoneColor = StoneColor.BLACK
@@ -45,6 +46,7 @@ class SettingsRepository(context: Context) {
         val premiumUnlocked = booleanPreferencesKey("premium_unlocked")
         val boardSize = intPreferencesKey("board_size")
         val komi = floatPreferencesKey("komi")
+        val handicap = intPreferencesKey("handicap")
         val aiLevel = stringPreferencesKey("ai_level")
         val autoAnalyze = booleanPreferencesKey("auto_analyze")
         val humanColor = stringPreferencesKey("human_color")
@@ -62,6 +64,7 @@ class SettingsRepository(context: Context) {
                 premiumUnlocked = preferences[Keys.premiumUnlocked] ?: false,
                 boardSize = (preferences[Keys.boardSize] ?: 19).coerceIn(9, 19),
                 komi = preferences[Keys.komi] ?: 7.5f,
+                handicap = (preferences[Keys.handicap] ?: 0).coerceIn(0, 9),
                 aiLevel = runCatching {
                     AiLevel.valueOf(preferences[Keys.aiLevel] ?: AiLevel.DEFAULT.name)
                 }.getOrDefault(AiLevel.DEFAULT),
@@ -89,6 +92,10 @@ class SettingsRepository(context: Context) {
 
     suspend fun setKomi(value: Float) {
         store.edit { it[Keys.komi] = value }
+    }
+
+    suspend fun setHandicap(value: Int) {
+        store.edit { it[Keys.handicap] = value.coerceIn(0, 9) }
     }
 
     suspend fun setAiLevel(value: AiLevel) {

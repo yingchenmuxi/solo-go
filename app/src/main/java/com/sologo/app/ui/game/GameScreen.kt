@@ -127,7 +127,10 @@ fun GameScreen(
                     onClick = vm::analyzeNow,
                     enabled = !state.busy && !state.gameOver,
                     modifier = Modifier.weight(1f)
-                ) { Text(if (state.advancedAccess) "AI 分析" else "解锁分析") }
+                ) { Text(if (state.advancedAccess) "局势分析" else "解锁分析") }
+            }
+            if (state.analysisVisible && state.analysis != null) {
+                SituationPanel(state)
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -315,6 +318,39 @@ private fun CandidatePanel(state: GameUiState) {
                         "目数 ${if (candidate.scoreLead >= 0) "+" else ""}${"%.1f".format(candidate.scoreLead)}  " +
                         "${candidate.visits} visits" + (if (pv.isBlank()) "" else "\nPV: $pv"),
                     style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SituationPanel(state: GameUiState) {
+    val best = state.analysis?.best ?: return
+    val columns = "ABCDEFGHJKLMNOPQRST"
+    val bestCoordinate = best.move?.let { "${columns[it.x]}${state.boardSize - it.y}" } ?: "pass"
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text("局势分析", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                "黑胜率 ${(best.winrate * 100).formatPercent()} · " +
+                    "目数差 ${if (best.scoreLead >= 0) "+" else ""}${"%.1f".format(best.scoreLead)} · " +
+                    "最佳点 $bestCoordinate",
+                style = MaterialTheme.typography.labelSmall
+            )
+            if (best.pv.isNotEmpty()) {
+                val pv = best.pv.take(5).joinToString(" ") {
+                    "${columns[it.x]}${state.boardSize - it.y}"
+                }
+                Text(
+                    "PV: $pv",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
