@@ -22,6 +22,8 @@ data class EngineConfig(
     // 默认偏速度：b6c96 小模型 + 4 线程下，60 visits 通常能在一两秒内落子。
     val defaultVisits: Int = 60,
     val maxVisits: Int = 4000,
+    /** 首次加载普通权重 + 99MB HumanSL 权重时，手机上可能需要几十秒。 */
+    val startupTimeoutMs: Long = 180_000,
     val commandTimeoutMs: Long = 30_000,
     val genmoveTimeoutMs: Long = 120_000,
     val analysisIntervalMs: Int = 300,

@@ -43,6 +43,7 @@ class GtpClient(
     private val binary: File,
     private val arguments: List<String>,
     private val workDir: File,
+    private val startupTimeoutMs: Long = 180_000,
     private val logger: (String) -> Unit = {}
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -76,7 +77,7 @@ class GtpClient(
                 _state.value = if (code == 0) GtpConnectionState.DISCONNECTED else GtpConnectionState.FAILED
             }
             // 用 name 命令做握手，顺便验证二进制/权限/配置是否正常。
-            val name = command("name", timeoutMs = 15_000)
+            val name = command("name", timeoutMs = startupTimeoutMs)
             logger("KataGo 已连接: $name")
             _state.value = GtpConnectionState.CONNECTED
         } catch (t: Throwable) {
@@ -134,7 +135,7 @@ class GtpClient(
         val command = "kata-analyze interval ${(intervalMs / 10).coerceAtLeast(1)} " +
             "ownership $ownership maxmoves $MAX_ANALYSIS_MOVES"
         write(command)
-        val first = receiveLine(command, 15_000)
+        val first = receiveAck(command, 15_000)
         if (first.startsWith("?")) throw GtpCommandException(command, first.removePrefix("?").trim())
         val output = mutableListOf<String>()
         val firstValue = first.removePrefix("=").trim()
@@ -209,11 +210,7 @@ class GtpClient(
         timeoutMs: Long,
         destroyOnTimeout: Boolean = true
     ): String {
-        var first = receiveLine(command, timeoutMs, destroyOnTimeout)
-        // 防御性跳过残留的空行/分析行，避免把上一轮 stop 的尾包当成本次命令结果。
-        while (first.isBlank() || first.startsWith("info ")) {
-            first = receiveLine(command, timeoutMs, destroyOnTimeout)
-        }
+        val first = receiveAck(command, timeoutMs, destroyOnTimeout)
         if (first.startsWith("?")) {
             throw GtpCommandException(command, first.removePrefix("?").trim())
         }
@@ -227,6 +224,21 @@ class GtpClient(
             body.appendLine(line)
         }
         return body.toString()
+    }
+
+    /**
+     * GTP 应答必须以 "=" 或 "?" 开头。KataGo 启动日志、分析输出和 stop 的
+     * 尾包都可能先到达 stdout，不能把它们当成命令的应答。
+     */
+    private suspend fun receiveAck(
+        command: String,
+        timeoutMs: Long,
+        destroyOnTimeout: Boolean = true
+    ): String {
+        while (true) {
+            val line = receiveLine(command, timeoutMs, destroyOnTimeout)
+            if (line.startsWith("=") || line.startsWith("?")) return line
+        }
     }
 
     /** 清掉通道里已经到达但没有被消费的旧应答/分析行。 */

@@ -71,6 +71,7 @@ class KataGoEngine(
                 binary = resources.binary,
                 arguments = arguments,
                 workDir = resources.workDir,
+                startupTimeoutMs = config.startupTimeoutMs,
                 logger = { Log.d(TAG, it) }
             )
             gtp = client
