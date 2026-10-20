@@ -21,6 +21,8 @@ import com.sologo.engine.BatteryTemperatureMonitor
 import com.sologo.engine.EngineConnectionLostException
 import com.sologo.engine.EngineState
 import com.sologo.engine.KataGoEngine
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -55,6 +57,10 @@ data class GameUiState(
     val scoreMarkers: List<Float> = emptyList(),
     val scoreSummary: ScoreSummary? = null,
     val scoreResult: String? = null,
+    val analysisVisible: Boolean = false,
+    val analysisRunning: Boolean = false,
+    val analysisOwnership: List<Float> = emptyList(),
+    val analysisVisits: Int = 0,
     val batteryTemp: Float? = null,
     val highTemp: Boolean = false,
     val error: String? = null
@@ -83,6 +89,7 @@ class GameViewModel(
     private val positionHistory = mutableListOf<BoardPosition>()
     private var isForeground = false
     private var autoSavedForGame = false
+    private var analysisJob: Job? = null
 
     init {
         battery.start()
@@ -130,6 +137,7 @@ class GameViewModel(
     ) {
         if (_uiState.value.started && !_uiState.value.gameOver) return
         viewModelScope.launch {
+            analysisJob?.cancel()
             val currentSettings = settings.settings.first()
             autoSavedForGame = false
             val resolvedSize = size ?: currentSettings.boardSize
@@ -168,7 +176,11 @@ class GameViewModel(
                     scoreVisible = false,
                     scoreMarkers = emptyList(),
                     scoreSummary = null,
-                    scoreResult = null
+                    scoreResult = null,
+                    analysisVisible = false,
+                    analysisRunning = false,
+                    analysisOwnership = emptyList(),
+                    analysisVisits = 0
                 )
             }
             positionHistory.clear()
@@ -277,6 +289,7 @@ class GameViewModel(
                 }
                 val restored = positionHistory.lastOrNull() ?: BoardPosition.empty(state.boardSize)
                 autoSavedForGame = false
+                analysisJob?.cancel()
                 _uiState.update {
                     it.copy(
                         busy = false,
@@ -289,7 +302,11 @@ class GameViewModel(
                         scoreVisible = false,
                         scoreMarkers = emptyList(),
                         scoreSummary = null,
-                        scoreResult = null
+                        scoreResult = null,
+                        analysisVisible = false,
+                        analysisRunning = false,
+                        analysisOwnership = emptyList(),
+                        analysisVisits = 0
                     )
                 }
             } catch (t: Throwable) {
@@ -364,6 +381,106 @@ class GameViewModel(
         }
     }
 
+    /**
+     * 形势分析开关。分析命令显式请求 ownership true，
+     * 返回数组按行优先排列，长度必须覆盖整个棋盘。
+     */
+    fun toggleAnalysis() {
+        val state = _uiState.value
+        if (!state.started || state.gameOver) return
+        if (state.analysisVisible || state.analysisRunning) {
+            analysisJob?.cancel()
+            _uiState.update {
+                it.copy(
+                    busy = false,
+                    analysisVisible = false,
+                    analysisRunning = false,
+                    analysisOwnership = emptyList(),
+                    analysisVisits = 0,
+                    status = "形势分析已关闭"
+                )
+            }
+            return
+        }
+        if (state.busy) {
+            _events.tryEmit(GameEvent.Message("KataGo 正在思考，请稍后再分析"))
+            return
+        }
+        if (state.highTemp) {
+            _events.tryEmit(GameEvent.Message("电池温度过高，已暂停 AI 搜索"))
+            return
+        }
+
+        analysisJob?.cancel()
+        analysisJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    busy = true,
+                    analysisRunning = true,
+                    analysisVisible = false,
+                    analysisOwnership = emptyList(),
+                    analysisVisits = 0,
+                    error = null,
+                    status = "正在分析形势…"
+                )
+            }
+            try {
+                val visits = settings.settings.first().aiLevel.analysisVisits.coerceIn(80, 200)
+                if (!engine.isRunning()) {
+                    restoreEngineForPosition(state)
+                }
+                val analysis = analyzeOwnershipWithRecovery(visits)
+                val expected = state.boardSize * state.boardSize
+                if (analysis.ownership.size < expected) {
+                    throw IllegalStateException(
+                        "KataGo 未返回完整领地数据：${analysis.ownership.size}/$expected"
+                    )
+                }
+                _uiState.update {
+                    it.copy(
+                        busy = false,
+                        analysisRunning = false,
+                        analysisVisible = true,
+                        analysisOwnership = analysis.ownership,
+                        analysisVisits = analysis.visits,
+                        status = "形势分析完成（${analysis.visits} visits）"
+                    )
+                }
+            } catch (t: CancellationException) {
+                throw t
+            } catch (t: Throwable) {
+                _uiState.update {
+                    it.copy(
+                        busy = false,
+                        analysisRunning = false,
+                        analysisVisible = false,
+                        analysisOwnership = emptyList(),
+                        analysisVisits = 0,
+                        status = "形势分析失败",
+                        error = t.message
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun analyzeOwnershipWithRecovery(visits: Int): PositionAnalysis {
+        suspend fun request() = engine.analyze(
+            maxVisits = visits,
+            intervalMs = 200,
+            durationMs = 700,
+            turn = _uiState.value.turn,
+            includeOwnership = true
+        )
+        return try {
+            request()
+        } catch (t: EngineConnectionLostException) {
+            if (!isForeground) throw t
+            restoreEngineForPosition(_uiState.value)
+            request()
+        }
+    }
+
     fun resign() {
         val state = _uiState.value
         if (!state.started || state.gameOver) return
@@ -392,6 +509,7 @@ class GameViewModel(
             _events.tryEmit(GameEvent.Message("KataGo 正在思考，请稍后再点数子"))
             return
         }
+        analysisJob?.cancel()
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -401,7 +519,11 @@ class GameViewModel(
                     scoreVisible = false,
                     scoreMarkers = emptyList(),
                     scoreSummary = null,
-                    scoreResult = null
+                    scoreResult = null,
+                    analysisVisible = false,
+                    analysisRunning = false,
+                    analysisOwnership = emptyList(),
+                    analysisVisits = 0
                 )
             }
             try {
@@ -532,6 +654,18 @@ class GameViewModel(
     /** App 进入后台时禁止重建引擎；KataGo 进程本身由 Application 统一销毁。 */
     fun onBackground() {
         isForeground = false
+        analysisJob?.cancel()
+        if (_uiState.value.analysisRunning) {
+            _uiState.update {
+                it.copy(
+                    busy = false,
+                    analysisRunning = false,
+                    analysisVisible = false,
+                    analysisOwnership = emptyList(),
+                    analysisVisits = 0
+                )
+            }
+        }
     }
 
     /**
@@ -635,6 +769,7 @@ class GameViewModel(
         if (point != null && nextBoard.stoneAt(point) == color) {
             moveSound.play(color)
         }
+        analysisJob?.cancel()
         _uiState.update {
             it.copy(
                 board = nextBoard,
@@ -645,12 +780,17 @@ class GameViewModel(
                 scoreMarkers = emptyList(),
                 scoreSummary = null,
                 scoreResult = null,
+                analysisVisible = false,
+                analysisRunning = false,
+                analysisOwnership = emptyList(),
+                analysisVisits = 0,
                 status = if (color == it.humanColor) "KataGo 正在思考…" else "轮到你落子"
             )
         }
     }
 
     override fun onCleared() {
+        analysisJob?.cancel()
         engine.shutdownNow()
         battery.stop()
         super.onCleared()

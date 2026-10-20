@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -98,14 +99,20 @@ fun GameScreen(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            CompactGameHeader(state)
+            CompactGameHeader(state, vm::toggleAnalysis)
+            val boardOwnership = if (state.scoreVisible) {
+                state.scoreMarkers
+            } else {
+                state.analysisOwnership
+            }
             GoBoard(
                 position = state.board,
                 enabled = !state.busy && !state.gameOver && !state.highTemp &&
                     state.turn == state.humanColor,
-                ownership = state.scoreMarkers,
-                showOwnership = state.scoreVisible && state.scoreMarkers.isNotEmpty(),
-                ownershipThreshold = 0.01f,
+                ownership = boardOwnership,
+                showOwnership = (state.scoreVisible && state.scoreMarkers.isNotEmpty()) ||
+                    (state.analysisVisible && state.analysisOwnership.isNotEmpty()),
+                ownershipThreshold = if (state.scoreVisible) 0.01f else 0.08f,
                 onIntersectionTap = vm::onBoardTap
             )
             if (state.scoreVisible) {
@@ -178,7 +185,10 @@ private fun AiThinkingTimer(active: Boolean, lastSeconds: Int?) {
 }
 
 @Composable
-private fun CompactGameHeader(state: GameUiState) {
+private fun CompactGameHeader(
+    state: GameUiState,
+    onToggleAnalysis: () -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -219,6 +229,37 @@ private fun CompactGameHeader(state: GameUiState) {
                         color = if (state.highTemp) MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TextButton(
+                    onClick = onToggleAnalysis,
+                    enabled = state.analysisVisible || state.analysisRunning || !state.busy,
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(
+                        text = when {
+                            state.analysisRunning -> "分析中…"
+                            state.analysisVisible -> "关闭形势"
+                            else -> "形势分析"
+                        },
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+                if (state.analysisVisible) {
+                    TerritoryLegendItem(TerritoryBlackColor, "黑势力")
+                    TerritoryLegendItem(TerritoryWhiteColor, "白势力")
+                    if (state.analysisVisits > 0) {
+                        Text(
+                            "${state.analysisVisits}v",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
             if (state.highTemp) {
