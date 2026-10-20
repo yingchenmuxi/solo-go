@@ -70,9 +70,9 @@ sgf/
 
 当前 debug APK 约 147MB，因为 HumanSL 权重随包携带；正式上架前需要确认商店包体限制，必要时改用 Play Asset Delivery 或首次下载。默认 5K profile，搜索受 `maxTime=1.5s` 和 4 线程限制。
 
-首页“开始人机对局”上方可选择 **10K / 5K / 1K / 1段**。每档会自动选择 HumanSL 的 `rank_*` profile，并调整 visits、搜索时间和着法温度；设置页不再暴露 visits。HumanSL 是无搜索的人类策略模型，实际强度仍受手机算力、profile 和模型本身限制。
+对弈页“开始人机对局”上方可选择 **10K / 5K / 1K / 1段**。每档会自动选择 HumanSL 的 `rank_*` profile，并调整 visits、搜索时间和着法温度；设置页不再暴露 visits。HumanSL 是无搜索的人类策略模型，实际强度仍受手机算力、profile 和模型本身限制。
 
-对局规则只提供 **中国规则** 和 **KataGo 默认规则**（当前 `gtp.cfg` 的默认规则也是中国规则）。贴目不开放给用户设置：分先 7.5 目、让先 0 目、让子棋 0.5 目，首页和对局状态栏会自动显示。让子方式仅提供 **分先（默认）/ 让先 / 2 / 3 / 4 / 5 / 9 子**；让子棋由人类执黑、AI 执白先行。
+对局规则只提供 **中国规则** 和 **KataGo 默认规则**（当前 `gtp.cfg` 的默认规则也是中国规则）。贴目不开放给用户设置：分先 7.5 目、让先 0 目、让子棋 0.5 目，对弈页和对局状态栏会自动显示。让子方式仅提供 **分先（默认）/ 让先 / 2 / 3 / 4 / 5 / 9 子**；让子棋由人类执黑、AI 执白先行。
 
 对局页暂时移除了“局势分析”。点击“数子”后会先用 `final_score` 得到 KataGo 结果，再用 ownership 在棋盘空点标出黑色和白色地盘；面板显示黑地、白地、含子与贴目的总占地、按标记计算的差距以及 KataGo 最终结果。死子会先从数子棋盘移除，再计算和标记。
 
@@ -115,12 +115,12 @@ SDK 至少需要 `platforms;android-37.0` 和 `build-tools;37.0.0`（AGP 也可�
 .\gradlew.bat :app:assembleDebug
 ```
 
-产物为 `app/build/outputs/apk/debug/app-debug.apk`（约 147MB，SHA256 `5DB1A068B077F8310EE043C27B5B7D3130FC916C25A6ABC71B391187A0C6E57B`）。APK 内已确认包含 `lib/arm64-v8a/libkatago.so`、普通权重、HumanSL 权重、`gtp.cfg` 和 MD5 清单。由于当前没有连接 arm64 真机/模拟器，尚未验证实际设备上的进程执行和触摸体验；这一步需要在 Android 10+ arm64 真机上安装 APK 后完成。
+产物为 `app/build/outputs/apk/debug/app-debug.apk`（约 147MB，SHA256 `39D7550E67CD622045316554D4EB0953EF529DEF0FA4AFDB8AC820FA35367748`）。APK 内已确认包含 `lib/arm64-v8a/libkatago.so`、普通权重、HumanSL 权重、`gtp.cfg` 和 MD5 清单。由于当前没有连接 arm64 真机/模拟器，尚未验证实际设备上的进程执行和触摸体验；这一步需要在 Android 10+ arm64 真机上安装 APK 后完成。
 
 每次执行 `assembleDebug` 后还会自动生成一份带北京时间戳的副本，例如：
 
 ```
-app/build/outputs/apk/debug/sologo_20261020_194425.apk
+app/build/outputs/apk/debug/sologo_20261020_195801.apk
 ```
 
 原始 `app-debug.apk` 仍保留，Android Studio 的 Run/Install 流程不受影响。`assembleRelease` 也会在 release 目录生成同样的 `sologo_日期_时间.apk`。
