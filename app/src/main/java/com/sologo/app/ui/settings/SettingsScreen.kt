@@ -70,7 +70,7 @@ fun SettingsScreen(
                     ) {
                         Text("对局结束后自动保存", style = MaterialTheme.typography.titleSmall)
                         Text(
-                            "保存到私有棋谱库，复盘页会自动加载",
+                            "保存到应用内棋谱记录，复盘页会自动加载",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -126,7 +126,7 @@ fun SettingsScreen(
                     TextButton(
                         onClick = onOpenAbout,
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-                    ) { Text("关于 SoloGo / KataGo") }
+                    ) { Text("关于独弈围棋 / KataGo") }
                 }
             }
         }

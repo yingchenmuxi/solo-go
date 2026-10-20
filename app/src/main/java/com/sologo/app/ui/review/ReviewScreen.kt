@@ -59,14 +59,11 @@ import kotlin.math.roundToInt
 @Composable
 fun ReviewScreen(
     container: AppContainer,
-    filePath: String?,
-    onBack: () -> Unit,
-    onOpenLibrary: () -> Unit
+    onBack: () -> Unit
 ) {
-    val file = remember(filePath) { filePath?.let(::File) }
     val vm: ReviewViewModel = viewModel(
-        key = "review-${file?.absolutePath ?: "empty"}",
-        factory = ReviewViewModelFactory(container, file)
+        key = "review-library",
+        factory = ReviewViewModelFactory(container, null)
     )
     val state by vm.state.collectAsStateWithLifecycle()
     val billingState by container.billing.state.collectAsStateWithLifecycle()
@@ -112,7 +109,7 @@ fun ReviewScreen(
             SavedGamePicker(
                 games = state.savedGames,
                 onSelect = vm::selectGame,
-                onOpenLibrary = onOpenLibrary,
+                onRefresh = vm::refreshSavedGames,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
@@ -130,7 +127,7 @@ fun ReviewScreen(
                     "复盘页支持标准 SGF 主线浏览、逐手前后切换，以及当前局面的 KataGo 推荐点分析。",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Button(onClick = onOpenLibrary) { Text("打开棋谱库") }
+                Button(onClick = vm::showSavedGames) { Text("返回棋谱列表") }
             }
         } else {
             Column(
@@ -267,7 +264,7 @@ fun ReviewScreen(
 private fun SavedGamePicker(
     games: List<SavedGame>,
     onSelect: (SavedGame) -> Unit,
-    onOpenLibrary: () -> Unit,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -286,7 +283,7 @@ private fun SavedGamePicker(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            TextButton(onClick = onOpenLibrary) { Text("棋谱库") }
+            TextButton(onClick = onRefresh) { Text("刷新") }
         }
 
         if (games.isEmpty()) {
@@ -301,7 +298,7 @@ private fun SavedGamePicker(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    OutlinedButton(onClick = onOpenLibrary) { Text("打开棋谱库") }
+                    OutlinedButton(onClick = onRefresh) { Text("刷新列表") }
                 }
             }
         } else {

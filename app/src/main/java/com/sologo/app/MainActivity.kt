@@ -1,6 +1,5 @@
 package com.sologo.app
 
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -25,19 +24,16 @@ import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.sologo.app.data.AppSettings
 import com.sologo.app.ui.about.AboutScreen
 import com.sologo.app.ui.about.PrivacyPolicyScreen
 import com.sologo.app.ui.components.PrivacyDialog
 import com.sologo.app.ui.game.GameScreen
 import com.sologo.app.ui.home.HomeScreen
-import com.sologo.app.ui.library.LibraryScreen
 import com.sologo.app.ui.review.ReviewScreen
 import com.sologo.app.ui.settings.SettingsScreen
 import com.sologo.app.ui.theme.SoloGoAppTheme
@@ -79,7 +75,6 @@ private data class TabItem(val route: String, val label: String, val icon: Int)
 
 private val tabs = listOf(
     TabItem("home", "首页", R.drawable.ic_home),
-    TabItem("library", "棋谱", R.drawable.ic_favorite),
     TabItem("review", "复盘", R.drawable.ic_account_box),
     TabItem("settings", "设置", R.drawable.ic_account_box)
 )
@@ -90,8 +85,7 @@ private fun SoloGoApp(container: AppContainer) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route.orEmpty()
     val routeBase = route.substringBefore("?")
-    val showBottomBar = routeBase in setOf("home", "library", "review", "settings")
-    val reviewPath = backStackEntry?.arguments?.getString("path")
+    val showBottomBar = routeBase in setOf("home", "review", "settings")
 
     Scaffold(
         bottomBar = {
@@ -132,7 +126,6 @@ private fun SoloGoApp(container: AppContainer) {
                 HomeScreen(
                     container = container,
                     onStartGame = { navController.navigate("game") },
-                    onOpenLibrary = { navController.navigate("library") },
                     onOpenReview = { navController.navigate("review") },
                     onOpenSettings = { navController.navigate("settings") }
                 )
@@ -143,36 +136,10 @@ private fun SoloGoApp(container: AppContainer) {
                     onBack = { navController.popBackStack() }
                 )
             }
-            composable("library") {
-                LibraryScreen(
-                    container = container,
-                    onOpenReview = { file ->
-                        navController.navigate("review?path=${Uri.encode(file.absolutePath)}")
-                    }
-                )
-            }
             composable("review") {
                 ReviewScreen(
                     container = container,
-                    filePath = null,
-                    onBack = { navController.popBackStack() },
-                    onOpenLibrary = { navController.navigate("library") }
-                )
-            }
-            composable(
-                route = "review?path={path}",
-                arguments = listOf(
-                    navArgument("path") {
-                        type = NavType.StringType
-                        defaultValue = ""
-                    }
-                )
-            ) {
-                ReviewScreen(
-                    container = container,
-                    filePath = reviewPath?.takeIf { it.isNotBlank() }?.let { Uri.decode(it) },
-                    onBack = { navController.popBackStack() },
-                    onOpenLibrary = { navController.navigate("library") }
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable("settings") {

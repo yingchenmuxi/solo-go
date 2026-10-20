@@ -32,7 +32,7 @@ fun PrivacyDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    "SoloGo 是单机围棋学习工具。基础对弈、SGF 棋谱管理和本地复盘不需要账号，也不会上传棋谱。"
+                    "独弈围棋是单机围棋学习工具。基础对弈、SGF 棋谱管理和本地复盘不需要账号，也不会上传棋谱。"
                 )
                 Text(
                     "本 APP 不包含广告 SDK。同意后才会启用应用商店购买相关功能；" +

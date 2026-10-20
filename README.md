@@ -1,6 +1,6 @@
-# SoloGo：KataGo 单机围棋学习 App
+# 独弈围棋：KataGo 单机围棋学习 App
 
-SoloGo 是一个 Android / Kotlin / Jetpack Compose 单机围棋学习工具。基础人机对局、SGF FF[4] 棋谱管理和本地复盘不依赖云端；当前局面分析、推荐点、胜率和候选 PV 通过本地 KataGo 完成。
+独弈围棋是一个 Android / Kotlin / Jetpack Compose 单机围棋学习工具。基础人机对局、SGF FF[4] 棋谱记录和本地复盘不依赖云端；当前局面分析、推荐点、胜率和候选 PV 通过本地 KataGo 完成。
 
 当前工程已经从空脚手架拆成四个模块，并实现了第一条完整链路：
 
@@ -44,7 +44,6 @@ app/
     ui/components/     GoBoard、图表、隐私/付费弹窗、Banner
     ui/game/           GameScreen、GameViewModel
     ui/review/         ReviewScreen、ReviewViewModel
-    ui/library/        LibraryScreen、LibraryViewModel
     ui/settings/       SettingsScreen、SettingsViewModel
     ui/home/ and ui/about/
   src/main/assets/katago/      权重/cfg 放置说明、MD5 示例
@@ -79,7 +78,7 @@ sgf/
 
 如果数子前 App 切后台导致 KataGo 子进程被销毁，重新进入对局后会按当前棋谱重建引擎，再继续数子；数子过程不会在后台启动新进程。
 
-设置页新增“对局结束后自动保存”。打开后，人类认输、KataGo 认输或数子完成时会自动把标准 SGF 保存到私有棋谱库；SGF 的 `DT` 记录对局日期，复盘列表同时显示精确保存时间、路数、手数和结果。复盘页在没有指定棋谱时会自动列出已存储对局，点击即可开始复盘，并支持开局/上一手/下一手/末手、进度条，以及“分析当前手”后显示前 5 个推荐点、胜率、目数和 PV。
+设置页新增“对局结束后自动保存”。打开后，人类认输、KataGo 认输或数子完成时会自动把标准 SGF 保存到应用内棋谱目录；SGF 的 `DT` 记录对局日期，复盘列表同时显示精确保存时间、路数、手数和结果。复盘页会自动列出已存储对局，点击即可开始复盘，并支持开局/上一手/下一手/末手、进度条，以及“分析当前手”后显示前 5 个推荐点、胜率、目数和 PV。
 
 App 图标已替换为设计稿 **B · 双石 / S-Stone**：深蓝棋盘背景、青绿色 S 形轨迹与黑白双石。矢量源文件位于 `design/logo-options/option-b-s-stone.svg`，并已生成 Adaptive Icon 前景、背景、单色主题图标及各密度传统图标。
 
@@ -116,12 +115,12 @@ SDK 至少需要 `platforms;android-37.0` 和 `build-tools;37.0.0`（AGP 也可�
 .\gradlew.bat :app:assembleDebug
 ```
 
-产物为 `app/build/outputs/apk/debug/app-debug.apk`（约 147MB，SHA256 `003DC41438723C307A56A402DE51A39A141CB50D60030BBC2F0F36A633A3FF41`）。APK 内已确认包含 `lib/arm64-v8a/libkatago.so`、普通权重、HumanSL 权重、`gtp.cfg` 和 MD5 清单。由于当前没有连接 arm64 真机/模拟器，尚未验证实际设备上的进程执行和触摸体验；这一步需要在 Android 10+ arm64 真机上安装 APK 后完成。
+产物为 `app/build/outputs/apk/debug/app-debug.apk`（约 147MB，SHA256 `5DB1A068B077F8310EE043C27B5B7D3130FC916C25A6ABC71B391187A0C6E57B`）。APK 内已确认包含 `lib/arm64-v8a/libkatago.so`、普通权重、HumanSL 权重、`gtp.cfg` 和 MD5 清单。由于当前没有连接 arm64 真机/模拟器，尚未验证实际设备上的进程执行和触摸体验；这一步需要在 Android 10+ arm64 真机上安装 APK 后完成。
 
 每次执行 `assembleDebug` 后还会自动生成一份带北京时间戳的副本，例如：
 
 ```
-app/build/outputs/apk/debug/sologo_20261020_192425.apk
+app/build/outputs/apk/debug/sologo_20261020_194425.apk
 ```
 
 原始 `app-debug.apk` 仍保留，Android Studio 的 Run/Install 流程不受影响。`assembleRelease` 也会在 release 目录生成同样的 `sologo_日期_时间.apk`。

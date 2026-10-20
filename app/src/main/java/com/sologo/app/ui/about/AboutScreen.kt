@@ -25,7 +25,7 @@ fun AboutScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("关于 SoloGo") },
+                title = { Text("关于独弈围棋") },
                 navigationIcon = { TextButton(onClick = onBack) { Text("返回") } }
             )
         }
@@ -38,7 +38,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("SoloGo", style = MaterialTheme.typography.headlineMedium)
+            Text("独弈围棋", style = MaterialTheme.typography.headlineMedium)
             Text(
                 "单机围棋学习工具。基础人机对局、SGF 棋谱管理和本地复盘可离线使用，" +
                     "高级分析通过应用商店一次性内购解锁。",

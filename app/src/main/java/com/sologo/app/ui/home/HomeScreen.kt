@@ -38,7 +38,6 @@ import com.sologo.core.model.StoneColor
 fun HomeScreen(
     container: AppContainer,
     onStartGame: () -> Unit,
-    onOpenLibrary: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
@@ -46,7 +45,7 @@ fun HomeScreen(
     val settings by vm.settings.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("SoloGo · 单机围棋") }) }
+        topBar = { TopAppBar(title = { Text("独弈围棋 · 单机学习") }) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -67,11 +66,11 @@ fun HomeScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "本地离线运行 · 基础对局免费 · 高级分析可解锁",
+                        "离线运行，无网络亦可对弈。",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text("AI 水平（近似）", style = MaterialTheme.typography.labelLarge)
+                    Text("AI 水平", style = MaterialTheme.typography.labelLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         AiLevel.entries.forEach { level ->
                             FilterChip(
@@ -81,11 +80,6 @@ fun HomeScreen(
                             )
                         }
                     }
-                    Text(
-                        "等级会自动调整搜索量、思考时间和着法变化；手机默认 5K。",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -155,13 +149,8 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text("继续学习", style = MaterialTheme.typography.titleMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onOpenLibrary, modifier = Modifier.weight(1f)) {
-                            Text("棋谱库")
-                        }
-                        OutlinedButton(onClick = onOpenReview, modifier = Modifier.weight(1f)) {
-                            Text("复盘")
-                        }
+                    OutlinedButton(onClick = onOpenReview, modifier = Modifier.fillMaxWidth()) {
+                        Text("复盘已保存对局")
                     }
                     OutlinedButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
                         Text("设置与高级功能")
