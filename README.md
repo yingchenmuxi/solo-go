@@ -77,6 +77,8 @@ sgf/
 
 对局页的“局势分析”会把 KataGo ownership 预测显示为蓝色黑方势力、红色白方势力，并按置信度加权计算双方预计面积和含贴目的差距；“分析关”会同时清除色块、候选点和目数汇总。
 
+如果分析期间 App 切后台导致 KataGo 子进程被销毁，重新进入对局后会在分析前按当前棋谱重建引擎并重试一次；关闭分析时也会确保发送 `stop`，避免引擎残留在分析模式。
+
 因为随包的 Android 引擎按 API 29 工具链构建，工程 `minSdk` 同步设为 29（Android 10）。如果必须支持 Android 7–9，需要换用对应 API 级别编译的 `libkatago.so`，不能直接复用当前二进制。
 
 ## 构建
@@ -110,12 +112,12 @@ SDK 至少需要 `platforms;android-37.0` 和 `build-tools;37.0.0`（AGP 也可�
 .\gradlew.bat :app:assembleDebug
 ```
 
-产物为 `app/build/outputs/apk/debug/app-debug.apk`（约 147MB，SHA256 `22A44C3EE4ADEE90BE4A9C97AF50DB9A2ABD4ABD221636D67E420455F245C7B5`）。APK 内已确认包含 `lib/arm64-v8a/libkatago.so`、普通权重、HumanSL 权重、`gtp.cfg` 和 MD5 清单。由于当前没有连接 arm64 真机/模拟器，尚未验证实际设备上的进程执行和触摸体验；这一步需要在 Android 10+ arm64 真机上安装 APK 后完成。
+产物为 `app/build/outputs/apk/debug/app-debug.apk`（约 147MB，SHA256 `3B39E4B21732B6D3172B56C77D80A2142D27AC450F18D891E4754615147667D4`）。APK 内已确认包含 `lib/arm64-v8a/libkatago.so`、普通权重、HumanSL 权重、`gtp.cfg` 和 MD5 清单。由于当前没有连接 arm64 真机/模拟器，尚未验证实际设备上的进程执行和触摸体验；这一步需要在 Android 10+ arm64 真机上安装 APK 后完成。
 
 每次执行 `assembleDebug` 后还会自动生成一份带北京时间戳的副本，例如：
 
 ```
-app/build/outputs/apk/debug/sologo_20261019_145003.apk
+app/build/outputs/apk/debug/sologo_20261020_171542.apk
 ```
 
 原始 `app-debug.apk` 仍保留，Android Studio 的 Run/Install 流程不受影响。`assembleRelease` 也会在 release 目录生成同样的 `sologo_日期_时间.apk`。

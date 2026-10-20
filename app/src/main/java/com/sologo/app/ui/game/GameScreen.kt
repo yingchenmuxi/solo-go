@@ -278,7 +278,11 @@ private fun CompactGameHeader(
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.weight(1f)
                     )
-                    TextButton(onClick = onToggleAnalysis, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+                    TextButton(
+                        onClick = onToggleAnalysis,
+                        enabled = state.analysisVisible || !state.busy,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                    ) {
                         Text(
                             if (state.analysisVisible) "分析关" else "分析开",
                             style = MaterialTheme.typography.labelSmall

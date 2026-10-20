@@ -17,8 +17,10 @@ import com.sologo.core.model.PositionAnalysis
 import com.sologo.core.model.StoneColor
 import com.sologo.core.model.TerritorySummary
 import com.sologo.engine.BatteryTemperatureMonitor
+import com.sologo.engine.EngineConnectionLostException
 import com.sologo.engine.EngineState
 import com.sologo.engine.KataGoEngine
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -324,16 +326,19 @@ class GameViewModel(
             _events.tryEmit(GameEvent.Message("电池温度过高，已暂停 AI 搜索"))
             return
         }
+        if (state.busy) {
+            _events.tryEmit(GameEvent.Message("KataGo 正在处理上一项操作，请稍后"))
+            return
+        }
         analysisJob?.cancel()
         analysisJob = viewModelScope.launch {
             _uiState.update { it.copy(analysisVisible = true, status = "KataGo 思考中…") }
             try {
                 val visits = settings.settings.first().aiLevel.visits.coerceAtLeast(20)
-                val analysis = engine.analyze(
-                    maxVisits = visits,
+                val analysis = analyzeCurrentPosition(
+                    visits = visits,
                     intervalMs = 300,
-                    durationMs = 700,
-                    turn = _uiState.value.turn
+                    durationMs = 700
                 )
                 val summary = TerritorySummary.fromOwnership(
                     ownership = analysis.ownership,
@@ -352,11 +357,17 @@ class GameViewModel(
                         winrate = analysis.blackWinrate,
                     )
                 }
+            } catch (t: CancellationException) {
+                throw t
             } catch (t: Throwable) {
                 _uiState.update {
                     it.copy(
-                        status = "分析失败",
-                        error = t.message,
+                        status = if (t is EngineConnectionLostException) {
+                            "引擎连接已断开，请重新点击局势分析"
+                        } else {
+                            "分析失败"
+                        },
+                        error = if (t is EngineConnectionLostException) null else t.message,
                         analysisVisible = false,
                         analysis = null,
                         candidates = emptyList(),
@@ -395,6 +406,10 @@ class GameViewModel(
                 )
             }
         } else {
+            if (state.busy) {
+                _events.tryEmit(GameEvent.Message("KataGo 正在思考，请稍后再分析"))
+                return
+            }
             _uiState.update { it.copy(analysisVisible = true) }
             analyzeNow()
         }
@@ -494,23 +509,7 @@ class GameViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(busy = true, status = "正在恢复引擎…") }
             try {
-                val current = settings.settings.first()
-                engine.initialize()
-                engine.setPlayStyle(current.aiLevel.playStyle)
-                engine.setHumanProfile(current.aiLevel.humanProfile)
-                engine.setRules(state.rules)
-                val effectiveVisits = current.aiLevel.visits
-                engine.newGame(
-                    state.boardSize,
-                    state.komi,
-                    effectiveVisits,
-                    state.handicap.coerceAtLeast(0)
-                )
-                state.moves.forEach { move ->
-                    if (!move.comment.contains("认输")) {
-                        engine.play(move.color, move.point)
-                    }
-                }
+                restoreEngineForPosition(state)
                 _uiState.update {
                     it.copy(
                         busy = false,
@@ -525,6 +524,62 @@ class GameViewModel(
                     it.copy(busy = false, status = "恢复引擎失败，请重新开局", error = t.message)
                 }
             }
+        }
+    }
+
+    /**
+     * 按当前棋谱重建 GTP 进程。
+     *
+     * 切后台、进程崩溃或 stdin 被关闭后，旧客户端不能再复用；
+     * 必须重新 initialize，并用 play/让子摆子把局面恢复到当前手。
+     */
+    private suspend fun restoreEngineForPosition(state: GameUiState) {
+        engine.shutdownNow()
+        val current = settings.settings.first()
+        engine.initialize()
+        engine.setPlayStyle(current.aiLevel.playStyle)
+        engine.setHumanProfile(current.aiLevel.humanProfile)
+        engine.setRules(state.rules)
+        engine.newGame(
+            state.boardSize,
+            state.komi,
+            current.aiLevel.visits,
+            state.handicap.coerceAtLeast(0)
+        )
+        state.moves.forEach { move ->
+            if (!move.comment.contains("认输")) {
+                engine.play(move.color, move.point)
+            }
+        }
+    }
+
+    /**
+     * 分析前确认引擎仍对应当前局面；如果 KataGo 子进程在后台被销毁，
+     * 先按棋谱恢复，再重试一次，避免把 Java 的 "Stream Closed" 直接展示给用户。
+     */
+    private suspend fun analyzeCurrentPosition(
+        visits: Int,
+        intervalMs: Int,
+        durationMs: Long
+    ): PositionAnalysis {
+        if (!engine.isRunning()) {
+            restoreEngineForPosition(_uiState.value)
+        }
+        return try {
+            engine.analyze(
+                maxVisits = visits,
+                intervalMs = intervalMs,
+                durationMs = durationMs,
+                turn = _uiState.value.turn
+            )
+        } catch (t: EngineConnectionLostException) {
+            restoreEngineForPosition(_uiState.value)
+            engine.analyze(
+                maxVisits = visits,
+                intervalMs = intervalMs,
+                durationMs = durationMs,
+                turn = _uiState.value.turn
+            )
         }
     }
 
@@ -627,11 +682,10 @@ class GameViewModel(
                 return@launch
             }
             try {
-                val analysis = engine.analyze(
-                    maxVisits = settings.settings.first().aiLevel.visits.coerceAtLeast(20),
+                val analysis = analyzeCurrentPosition(
+                    visits = settings.settings.first().aiLevel.visits.coerceAtLeast(20),
                     intervalMs = 300,
-                    durationMs = 450,
-                    turn = _uiState.value.turn
+                    durationMs = 450
                 )
                 val summary = TerritorySummary.fromOwnership(
                     ownership = analysis.ownership,

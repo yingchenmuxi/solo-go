@@ -42,6 +42,17 @@ data class InstalledEngine(
 
 class KataGoException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
+/**
+ * GTP 子进程的 stdin/stdout 已关闭。
+ *
+ * 常见于 App 切后台后 [KataGoEngine.shutdownNow] 强制结束进程，
+ * 或系统/引擎异常退出。上层可以按当前棋谱重建进程后重试一次。
+ */
+class EngineConnectionLostException(
+    message: String = "KataGo 连接已关闭",
+    cause: Throwable? = null
+) : Exception(message, cause)
+
 class GtpCommandException(
     val command: String,
     val serverMessage: String

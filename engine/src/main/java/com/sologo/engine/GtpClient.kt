@@ -1,11 +1,14 @@
 package com.sologo.engine
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +24,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 enum class GtpConnectionState {
@@ -134,30 +138,40 @@ class GtpClient(
         // maxmoves 限制单次输出候选数，避免完整 361 点分析把 stdout 撑爆。
         val command = "kata-analyze interval ${(intervalMs / 10).coerceAtLeast(1)} " +
             "ownership $ownership maxmoves $MAX_ANALYSIS_MOVES"
-        write(command)
-        val first = receiveAck(command, 15_000)
-        if (first.startsWith("?")) throw GtpCommandException(command, first.removePrefix("?").trim())
         val output = mutableListOf<String>()
-        val firstValue = first.removePrefix("=").trim()
-        if (firstValue.startsWith("info ")) output.add(firstValue)
-        val deadline = System.currentTimeMillis() + durationMs
-        while (true) {
-            val remaining = deadline - System.currentTimeMillis()
-            if (remaining <= 0) break
-            val line = withTimeoutOrNull(remaining) { lines.receiveCatching().getOrNull() } ?: break
-            if (line.isBlank()) break
-            if (line.startsWith("info ")) output.add(line)
-        }
-        // 让 KataGo 停止当前分析；随后丢弃 stop 的应答和可能残留的分析行。
-        runCatching { write("stop") }
-        withTimeoutOrNull(2_000) {
+        try {
+            write(command)
+            val first = receiveAck(command, 15_000)
+            if (first.startsWith("?")) {
+                throw GtpCommandException(command, first.removePrefix("?").trim())
+            }
+            val firstValue = first.removePrefix("=").trim()
+            if (firstValue.startsWith("info ")) output.add(firstValue)
+            val deadline = System.currentTimeMillis() + durationMs
             while (true) {
-                val line = lines.receiveCatching().getOrNull() ?: break
+                val remaining = deadline - System.currentTimeMillis()
+                if (remaining <= 0) break
+                val line = withTimeoutOrNull(remaining) {
+                    lines.receiveCatching().getOrNull()
+                } ?: break
                 if (line.isBlank()) break
+                if (line.startsWith("info ")) output.add(line)
+            }
+            output
+        } finally {
+            // 分析取消/超时/异常时也必须让 KataGo 退出分析模式。
+            // 使用 NonCancellable，避免用户关闭分析后 stop 指令没有发出去。
+            withContext(NonCancellable) {
+                runCatching { write("stop") }
+                withTimeoutOrNull(2_000) {
+                    while (true) {
+                        val line = lines.receiveCatching().getOrNull() ?: break
+                        if (line.isBlank()) break
+                    }
+                }
+                drainBufferedLines()
             }
         }
-        drainBufferedLines()
-        output
     }
 
     /** 从 UI/温度监控线程请求停止当前搜索；不阻塞。 */
@@ -200,9 +214,15 @@ class GtpClient(
 
     private suspend fun write(command: String) = writeMutex.withLock {
         val writer = stdin ?: throw EngineNotReadyException()
-        writer.write(command)
-        writer.newLine()
-        writer.flush()
+        try {
+            writer.write(command)
+            writer.newLine()
+            writer.flush()
+        } catch (t: IOException) {
+            logger("GTP 输入流已关闭: ${t.message}")
+            _state.value = GtpConnectionState.FAILED
+            throw EngineConnectionLostException("KataGo 输入流已关闭，无法发送命令", t)
+        }
     }
 
     private suspend fun readResponse(
@@ -255,11 +275,20 @@ class GtpClient(
     ): String {
         return try {
             withTimeout(timeoutMs) { lines.receive() }
-        } catch (t: Throwable) {
-            if (t is kotlinx.coroutines.TimeoutCancellationException && destroyOnTimeout) {
+        } catch (t: ClosedReceiveChannelException) {
+            logger("GTP 输出流已关闭: ${t.message}")
+            _state.value = GtpConnectionState.FAILED
+            throw EngineConnectionLostException("KataGo 输出流已关闭", t)
+        } catch (t: kotlinx.coroutines.TimeoutCancellationException) {
+            if (destroyOnTimeout) {
                 runCatching { process?.destroyForcibly() }
             }
             throw KataGoException("等待 GTP 响应超时/断开: $command", t)
+        } catch (t: CancellationException) {
+            // 上层主动取消分析时保持协程取消语义，不伪装成引擎错误。
+            throw t
+        } catch (t: Throwable) {
+            throw KataGoException("等待 GTP 响应失败: $command", t)
         }
     }
 
