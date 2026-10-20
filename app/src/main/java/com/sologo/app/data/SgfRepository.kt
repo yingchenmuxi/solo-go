@@ -16,7 +16,11 @@ data class SavedGame(
     val file: File,
     val title: String,
     val modifiedAt: Long,
-    val hasAnalysis: Boolean
+    val hasAnalysis: Boolean,
+    val playedAt: String = "",
+    val result: String = "",
+    val moveCount: Int = 0,
+    val boardSize: Int = 0
 )
 
 /**
@@ -37,16 +41,21 @@ class SgfRepository(context: Context) {
             .orEmpty()
             .sortedByDescending { it.lastModified() }
             .map { file ->
-                val title = runCatching {
+                val record = runCatching {
                     SgfCodec.decode(file.readText(Charsets.UTF_8))
-                }.getOrNull()?.let { record ->
-                    record.blackName.ifBlank { "黑" } + " vs " + record.whiteName.ifBlank { "白" }
+                }.getOrNull()
+                val title = record?.let { parsed ->
+                    parsed.blackName.ifBlank { "黑" } + " vs " + parsed.whiteName.ifBlank { "白" }
                 } ?: file.nameWithoutExtension
                 SavedGame(
                     file = file,
                     title = title,
                     modifiedAt = file.lastModified(),
-                    hasAnalysis = AnalysisStore.companionFile(file).exists()
+                    hasAnalysis = AnalysisStore.companionFile(file).exists(),
+                    playedAt = record?.date.orEmpty(),
+                    result = record?.result.orEmpty(),
+                    moveCount = record?.moves?.size ?: 0,
+                    boardSize = record?.size ?: 0
                 )
             }
     }

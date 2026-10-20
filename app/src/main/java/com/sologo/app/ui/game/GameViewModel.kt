@@ -31,6 +31,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class GameUiState(
     val boardSize: Int = 19,
@@ -57,7 +60,7 @@ data class GameUiState(
 )
 
 sealed interface GameEvent {
-    data class Saved(val file: File) : GameEvent
+    data class Saved(val file: File, val automatic: Boolean = false) : GameEvent
     data class Message(val text: String) : GameEvent
 }
 
@@ -77,6 +80,7 @@ class GameViewModel(
 
     private val positionHistory = mutableListOf<BoardPosition>()
     private var isForeground = false
+    private var autoSavedForGame = false
 
     init {
         battery.start()
@@ -125,6 +129,7 @@ class GameViewModel(
         if (_uiState.value.started && !_uiState.value.gameOver) return
         viewModelScope.launch {
             val currentSettings = settings.settings.first()
+            autoSavedForGame = false
             val resolvedSize = size ?: currentSettings.boardSize
             val resolvedRules = currentSettings.rules
             val resolvedHandicap = HandicapOptions.normalize(currentSettings.handicap)
@@ -269,6 +274,7 @@ class GameViewModel(
                     }
                 }
                 val restored = positionHistory.lastOrNull() ?: BoardPosition.empty(state.boardSize)
+                autoSavedForGame = false
                 _uiState.update {
                     it.copy(
                         busy = false,
@@ -298,20 +304,61 @@ class GameViewModel(
         }
         viewModelScope.launch {
             try {
-                val record = GameRecord(
-                    size = state.boardSize,
-                    komi = state.komi,
-                    rules = state.rules.sgfName,
-                    handicap = state.handicap.coerceAtLeast(0),
-                    setupBlack = state.setupBlack,
-                    moves = state.moves,
-                    result = if (state.gameOver) "已结束" else ""
-                )
-                val file = sgfRepository.save(record)
+                val file = sgfRepository.save(buildGameRecord(state))
+                if (state.gameOver) autoSavedForGame = true
                 _events.emit(GameEvent.Saved(file))
             } catch (t: Throwable) {
                 _events.emit(GameEvent.Message("保存失败: ${t.message}"))
             }
+        }
+    }
+
+    /** 对局结束路径统一调用；开关关闭或本局已自动保存时直接跳过。 */
+    private suspend fun autoSaveGameIfEnabled() {
+        val state = _uiState.value
+        if (!state.started || !state.gameOver || state.moves.isEmpty() || autoSavedForGame) return
+        val current = settings.settings.first()
+        if (!current.autoSaveGames) return
+        autoSavedForGame = true
+        try {
+            val file = sgfRepository.save(buildGameRecord(state))
+            _events.emit(GameEvent.Saved(file, automatic = true))
+            _uiState.update {
+                it.copy(status = "${it.status} · 已自动保存棋谱")
+            }
+        } catch (t: Throwable) {
+            autoSavedForGame = false
+            _events.emit(GameEvent.Message("自动保存失败: ${t.message}"))
+        }
+    }
+
+    private fun buildGameRecord(state: GameUiState): GameRecord {
+        val blackName = if (state.humanColor == StoneColor.BLACK) "你" else "KataGo"
+        val whiteName = if (state.humanColor == StoneColor.WHITE) "你" else "KataGo"
+        val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        return GameRecord(
+            size = state.boardSize,
+            komi = state.komi,
+            rules = state.rules.sgfName,
+            handicap = state.handicap.coerceAtLeast(0),
+            blackName = blackName,
+            whiteName = whiteName,
+            result = resultText(state),
+            date = date,
+            setupBlack = state.setupBlack,
+            moves = state.moves
+        )
+    }
+
+    private fun resultText(state: GameUiState): String {
+        state.scoreResult?.let { return it }
+        if (!state.gameOver) return ""
+        return when {
+            state.status.contains("你已认输") ->
+                if (state.humanColor == StoneColor.BLACK) "W+R" else "B+R"
+            state.status.contains("KataGo 认输") ->
+                if (state.humanColor == StoneColor.BLACK) "B+R" else "W+R"
+            else -> "?"
         }
     }
 
@@ -324,6 +371,7 @@ class GameViewModel(
                 status = "你已认输"
             )
         }
+        viewModelScope.launch { autoSaveGameIfEnabled() }
     }
 
     /**
@@ -432,6 +480,7 @@ class GameViewModel(
                         }
                     )
                 }
+                autoSaveGameIfEnabled()
             } catch (t: Throwable) {
                 _uiState.update {
                     it.copy(busy = false, status = "数子失败", error = t.message)
@@ -542,6 +591,7 @@ class GameViewModel(
                     it.copy(busy = false, gameOver = true, status = "KataGo 认输，你赢了")
                 }
                 _events.tryEmit(GameEvent.Message("KataGo 认输，你赢了"))
+                autoSaveGameIfEnabled()
                 return
             }
             if (generated.point == null) {

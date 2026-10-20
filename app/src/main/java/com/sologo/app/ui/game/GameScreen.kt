@@ -70,7 +70,10 @@ fun GameScreen(
     LaunchedEffect(vm) {
         vm.events.collect { event ->
             when (event) {
-                is GameEvent.Saved -> snackbarHostState.showSnackbar("棋谱已保存: ${event.file.name}")
+                is GameEvent.Saved -> snackbarHostState.showSnackbar(
+                    if (event.automatic) "棋谱已自动保存: ${event.file.name}"
+                    else "棋谱已保存: ${event.file.name}"
+                )
                 is GameEvent.Message -> snackbarHostState.showSnackbar(event.text)
             }
         }

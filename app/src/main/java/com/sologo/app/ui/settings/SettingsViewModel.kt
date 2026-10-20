@@ -27,6 +27,10 @@ class SettingsViewModel(
         container.settings.setHumanColor(value)
     }
 
+    fun setAutoSaveGames(value: Boolean) = viewModelScope.launch {
+        container.settings.setAutoSaveGames(value)
+    }
+
     fun restorePurchases() {
         container.billing.start()
     }

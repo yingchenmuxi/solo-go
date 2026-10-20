@@ -30,6 +30,7 @@ data class AppSettings(
     val rules: GameRules = GameRules.CHINESE,
     val aiLevel: AiLevel = AiLevel.DEFAULT,
     val autoAnalyze: Boolean = false,
+    val autoSaveGames: Boolean = false,
     val humanColor: StoneColor = StoneColor.BLACK
 ) {
     fun hasAdvancedAccess(): Boolean =
@@ -51,6 +52,7 @@ class SettingsRepository(context: Context) {
         val rules = stringPreferencesKey("rules")
         val aiLevel = stringPreferencesKey("ai_level")
         val autoAnalyze = booleanPreferencesKey("auto_analyze")
+        val autoSaveGames = booleanPreferencesKey("auto_save_games")
         val humanColor = stringPreferencesKey("human_color")
     }
 
@@ -73,6 +75,7 @@ class SettingsRepository(context: Context) {
                     AiLevel.valueOf(preferences[Keys.aiLevel] ?: AiLevel.DEFAULT.name)
                 }.getOrDefault(AiLevel.DEFAULT),
                 autoAnalyze = preferences[Keys.autoAnalyze] ?: false,
+                autoSaveGames = preferences[Keys.autoSaveGames] ?: false,
                 humanColor = runCatching {
                     StoneColor.valueOf(preferences[Keys.humanColor] ?: StoneColor.BLACK.name)
                 }.getOrDefault(StoneColor.BLACK)
@@ -108,6 +111,10 @@ class SettingsRepository(context: Context) {
 
     suspend fun setAutoAnalyze(value: Boolean) {
         store.edit { it[Keys.autoAnalyze] = value }
+    }
+
+    suspend fun setAutoSaveGames(value: Boolean) {
+        store.edit { it[Keys.autoSaveGames] = value }
     }
 
     suspend fun setHumanColor(value: StoneColor) {

@@ -3,6 +3,7 @@ package com.sologo.app.ui.review
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sologo.app.AppContainer
+import com.sologo.app.data.SavedGame
 import com.sologo.app.data.SettingsRepository
 import com.sologo.core.model.BoardPosition
 import com.sologo.core.model.CandidateMove
@@ -27,6 +28,8 @@ import kotlin.math.abs
 
 data class ReviewUiState(
     val file: File? = null,
+    val selectedGame: SavedGame? = null,
+    val savedGames: List<SavedGame> = emptyList(),
     val record: GameRecord? = null,
     val positions: List<BoardPosition> = emptyList(),
     val selectedIndex: Int = 0,
@@ -53,7 +56,9 @@ class ReviewViewModel(
     private val container: AppContainer,
     initialFile: File?
 ) : ViewModel() {
-    private val _state = MutableStateFlow(ReviewUiState(file = initialFile))
+    private val _state = MutableStateFlow(
+        ReviewUiState(file = initialFile, loading = initialFile != null)
+    )
     val state: StateFlow<ReviewUiState> = _state.asStateFlow()
     private val settings: SettingsRepository = container.settings
 
@@ -75,7 +80,50 @@ class ReviewViewModel(
                 _state.update { it.copy(advancedAccess = s.hasAdvancedAccess()) }
             }
         }
-        if (initialFile != null) load(initialFile)
+        if (initialFile != null) {
+            load(initialFile)
+        } else {
+            refreshSavedGames()
+        }
+    }
+
+    /** 复盘页没有指定文件时，自动读取私有棋谱目录并展示可选对局。 */
+    fun refreshSavedGames() {
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null) }
+            val games = runCatching { container.sgfRepository.list() }
+                .onFailure {
+                    _state.update { state ->
+                        state.copy(error = "读取已存储对局失败: ${it.message}")
+                    }
+                }
+                .getOrDefault(emptyList())
+            _state.update { it.copy(savedGames = games, loading = false) }
+        }
+    }
+
+    fun selectGame(game: SavedGame) {
+        load(game.file)
+    }
+
+    fun showSavedGames() {
+        _state.update {
+            it.copy(
+                file = null,
+                selectedGame = null,
+                record = null,
+                positions = emptyList(),
+                analysis = null,
+                selectedMove = null,
+                ownership = emptyList(),
+                candidates = emptyList(),
+                selectedIndex = 0,
+                board = BoardPosition.empty(19),
+                error = null,
+                message = null
+            )
+        }
+        refreshSavedGames()
     }
 
     fun load(file: File) {
@@ -91,6 +139,9 @@ class ReviewViewModel(
                 _state.update {
                     it.copy(
                         file = file,
+                        selectedGame = it.savedGames.firstOrNull { saved ->
+                            saved.file.absolutePath == file.absolutePath
+                        },
                         record = record,
                         positions = positions,
                         selectedIndex = 0,

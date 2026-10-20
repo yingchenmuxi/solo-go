@@ -174,7 +174,9 @@ private fun GameCard(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "修改于 " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                text = "对局时间：${game.playedAt.ifBlank {
+                    SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(game.modifiedAt))
+                }} · 保存于 " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
                     .format(Date(game.modifiedAt)) +
                     if (game.hasAnalysis) " · 已有 AI 复盘" else "",
                 style = MaterialTheme.typography.bodySmall,
