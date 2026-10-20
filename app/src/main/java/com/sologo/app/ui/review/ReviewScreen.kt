@@ -36,7 +36,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -49,9 +48,6 @@ import com.sologo.app.AppContainer
 import com.sologo.app.data.SavedGame
 import com.sologo.app.ui.components.GoBoard
 import com.sologo.app.ui.components.PaywallDialog
-import com.sologo.app.ui.components.ScoreLeadChart
-import com.sologo.app.ui.components.WinrateChart
-import com.sologo.core.model.MoveAnalysis
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -131,7 +127,7 @@ fun ReviewScreen(
             ) {
                 Text("选择一盘棋开始复盘", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "复盘页支持标准 SGF、多分支棋谱树的主线浏览，以及 KataGo 领地热力和逐手亏损分析。",
+                    "复盘页支持标准 SGF 主线浏览、逐手前后切换，以及当前局面的 KataGo 推荐点分析。",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Button(onClick = onOpenLibrary) { Text("打开棋谱库") }
@@ -224,16 +220,16 @@ fun ReviewScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
-                    onClick = vm::analyzeAll,
+                    onClick = vm::analyzeCurrent,
                     enabled = !state.analyzing && state.advancedAccess && !state.highTemp,
                     modifier = Modifier.weight(1f)
-                ) { Text(if (state.advancedAccess) "AI 整盘分析" else "解锁高级复盘") }
+                ) { Text(if (state.advancedAccess) "分析当前手" else "解锁当前手分析") }
                 Text(
                     text = when {
                         state.analyzing -> "分析中…"
                         state.highTemp -> "温度过高，已暂停"
-                        state.analysis != null -> "已保存分析"
-                        else -> "尚未分析"
+                        state.candidates.isNotEmpty() -> "推荐 ${state.candidates.size} 个点"
+                        else -> "尚未分析当前手"
                     },
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -244,22 +240,9 @@ fun ReviewScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            state.selectedMove?.let { MoveDetail(it) }
-            if (state.advancedAccess) {
-                WinrateChart(moves = state.analysis?.moves.orEmpty(), modifier = Modifier.fillMaxWidth())
-                ScoreLeadChart(moves = state.analysis?.moves.orEmpty(), modifier = Modifier.fillMaxWidth())
-            } else {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "解锁后可查看胜率曲线、目数差曲线、领地热力、候选 PV 和逐手恶手标记。",
-                        modifier = Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+            if (state.advancedAccess && state.candidates.isNotEmpty()) {
+                CandidateList(state)
             }
-                if (state.advancedAccess && state.candidates.isNotEmpty()) {
-                    CandidateList(state)
-                }
             }
         }
     }
@@ -381,45 +364,14 @@ private fun savedGameTimeText(game: SavedGame): String {
 }
 
 @Composable
-private fun MoveDetail(move: MoveAnalysis) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = "第 ${move.moveNumber} 手 · ${if (move.color.name == "BLACK") "黑" else "白"}",
-                style = MaterialTheme.typography.titleSmall
-            )
-            Text(
-                text = "胜率 ${(move.winrateBefore * 100).toInt()}% → ${(move.winrateAfter * 100).toInt()}% " +
-                    "· 亏损 ${"%.1f".format(move.loss * 100)}%",
-                style = MaterialTheme.typography.bodySmall
-            )
-            Text(
-                text = "目数 ${"%.1f".format(move.scoreLeadBefore)} → ${"%.1f".format(move.scoreLeadAfter)}",
-                style = MaterialTheme.typography.bodySmall
-            )
-            if (move.isBlunder) {
-                Text(
-                    text = "⚠ 恶手候选",
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun CandidateList(state: ReviewUiState) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            Text("该局面的候选点", style = MaterialTheme.typography.titleSmall)
-            state.candidates.take(6).forEachIndexed { index, candidate ->
+            Text("当前局面推荐点", style = MaterialTheme.typography.titleSmall)
+            state.candidates.take(5).forEachIndexed { index, candidate ->
                 val columns = "ABCDEFGHJKLMNOPQRST"
                 val boardSize = state.record?.size ?: 19
                 val coordinate = candidate.move?.let {

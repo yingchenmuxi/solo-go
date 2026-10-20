@@ -214,11 +214,12 @@ class KataGoEngine(
         maxVisits: Int = visits,
         intervalMs: Int = config.analysisIntervalMs,
         durationMs: Long = config.analysisDurationMs,
-        turn: StoneColor = StoneColor.BLACK
+        turn: StoneColor = StoneColor.BLACK,
+        includeOwnership: Boolean = true
     ): PositionAnalysis {
         ensureReady()
         setVisitsInternal(maxVisits.coerceIn(1, config.maxVisits))
-        val infoLines = gtp!!.analyze(intervalMs, durationMs)
+        val infoLines = gtp!!.analyze(intervalMs, durationMs, includeOwnership)
         return parseAnalysis(infoLines, turn)
     }
 

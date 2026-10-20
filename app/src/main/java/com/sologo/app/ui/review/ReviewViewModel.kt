@@ -7,13 +7,10 @@ import com.sologo.app.data.SavedGame
 import com.sologo.app.data.SettingsRepository
 import com.sologo.core.model.BoardPosition
 import com.sologo.core.model.CandidateMove
-import com.sologo.core.model.GameAnalysis
 import com.sologo.core.model.GameRecord
-import com.sologo.core.model.MoveAnalysis
-import com.sologo.core.model.PositionAnalysis
 import com.sologo.core.model.StoneColor
-import com.sologo.sgf.AnalysisStore
 import com.sologo.sgf.SgfCodec
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +21,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import kotlin.math.abs
 
 data class ReviewUiState(
     val file: File? = null,
@@ -34,10 +30,9 @@ data class ReviewUiState(
     val positions: List<BoardPosition> = emptyList(),
     val selectedIndex: Int = 0,
     val board: BoardPosition = BoardPosition.empty(19),
-    val analysis: GameAnalysis? = null,
-    val selectedMove: MoveAnalysis? = null,
     val ownership: List<Float> = emptyList(),
     val candidates: List<CandidateMove> = emptyList(),
+    val analysisVisits: Int = 0,
     val advancedAccess: Boolean = false,
     val showPaywall: Boolean = false,
     val loading: Boolean = false,
@@ -61,6 +56,7 @@ class ReviewViewModel(
     )
     val state: StateFlow<ReviewUiState> = _state.asStateFlow()
     private val settings: SettingsRepository = container.settings
+    private var analysisJob: Job? = null
 
     init {
         container.battery.start()
@@ -107,16 +103,18 @@ class ReviewViewModel(
     }
 
     fun showSavedGames() {
+        analysisJob?.cancel()
         _state.update {
             it.copy(
                 file = null,
                 selectedGame = null,
                 record = null,
                 positions = emptyList(),
-                analysis = null,
-                selectedMove = null,
                 ownership = emptyList(),
                 candidates = emptyList(),
+                analysisVisits = 0,
+                analyzing = false,
+                progress = 0f,
                 selectedIndex = 0,
                 board = BoardPosition.empty(19),
                 error = null,
@@ -127,15 +125,21 @@ class ReviewViewModel(
     }
 
     fun load(file: File) {
+        analysisJob?.cancel()
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, error = null, message = null) }
+            _state.update {
+                it.copy(
+                    loading = true,
+                    analyzing = false,
+                    progress = 0f,
+                    error = null,
+                    message = null
+                )
+            }
             try {
                 val text = withContext(Dispatchers.IO) { file.readText(Charsets.UTF_8) }
                 val record = withContext(Dispatchers.IO) { SgfCodec.decode(text) }
                 val positions = buildPositions(record)
-                val hash = AnalysisStore.sha256(text)
-                val analysis = withContext(Dispatchers.IO) { AnalysisStore.load(file) }
-                    ?.takeIf { it.sgfHash.isBlank() || it.sgfHash == hash }
                 _state.update {
                     it.copy(
                         file = file,
@@ -146,10 +150,9 @@ class ReviewViewModel(
                         positions = positions,
                         selectedIndex = 0,
                         board = positions.firstOrNull() ?: BoardPosition.empty(record.size),
-                        analysis = analysis,
-                        selectedMove = null,
                         ownership = emptyList(),
                         candidates = emptyList(),
+                        analysisVisits = 0,
                         loading = false
                     )
                 }
@@ -165,23 +168,25 @@ class ReviewViewModel(
         val state = _state.value
         if (state.positions.isEmpty()) return
         val safe = index.coerceIn(0, state.positions.lastIndex)
-        val move = state.analysis?.moves?.getOrNull(safe - 1)
+        analysisJob?.cancel()
         _state.update {
             it.copy(
                 selectedIndex = safe,
                 board = state.positions[safe],
-                selectedMove = move,
-                ownership = move?.ownership.orEmpty(),
-                candidates = move?.candidates.orEmpty()
+                ownership = emptyList(),
+                candidates = emptyList(),
+                analysisVisits = 0,
+                analyzing = false,
+                progress = 0f
             )
         }
     }
 
     /**
-     * 整盘自动复盘：对每个局面执行一次 kata-analyze，再 play 下一手。
-     * 单手亏损 = 该手前最佳胜率与该手后胜率的差（按行棋方视角）。
+     * 只分析当前选中的局面，避免整盘逐手分析耗时。
+     * KataGo 至少加载到 selectedIndex 手，再用一次 kata-analyze 取前几个推荐点。
      */
-    fun analyzeAll() {
+    fun analyzeCurrent() {
         val state = _state.value
         if (state.file == null || state.record == null) return
         if (!state.advancedAccess) {
@@ -193,75 +198,70 @@ class ReviewViewModel(
             return
         }
         if (state.analyzing) return
+
         val file = state.file
         val record = state.record
-        viewModelScope.launch {
+        val selectedIndex = state.selectedIndex
+        analysisJob?.cancel()
+        analysisJob = viewModelScope.launch {
             _state.update {
-                it.copy(analyzing = true, progress = 0f, error = null, message = "正在启动 KataGo…")
+                it.copy(
+                    analyzing = true,
+                    progress = 0f,
+                    error = null,
+                    message = "正在分析当前局面…",
+                    ownership = emptyList(),
+                    candidates = emptyList(),
+                    analysisVisits = 0
+                )
             }
             try {
-                val visits = settings.settings.first().aiLevel.analysisVisits
+                // 当前局面分析保持轻量：限制 visits，单次分析受 maxTime 约束。
+                val visits = settings.settings.first().aiLevel.analysisVisits.coerceIn(60, 160)
                 container.engine.initialize()
-                // 优先让 KataGo 读取 SGF（可保留 AB/AW 摆子）；失败则退回空棋盘重放。
                 val loadedSgf = runCatching {
-                    container.engine.loadsgf(file.absolutePath, 0, record.size)
+                    container.engine.loadsgf(file.absolutePath, selectedIndex, record.size)
                 }.isSuccess
                 if (!loadedSgf) {
-                    container.engine.newGame(record.size, record.komi, visits)
-                }
-                val positionAnalyses = mutableListOf<PositionAnalysis>()
-                val total = record.moves.size + 1
-                for (index in 0 until total) {
-                    val turn = if (index < record.moves.size) {
-                        record.moves[index].color
-                    } else {
-                        record.moves.lastOrNull()?.color?.opponent ?: StoneColor.BLACK
-                    }
-                    _state.update {
-                        it.copy(
-                            progress = index.toFloat() / total.coerceAtLeast(1),
-                            message = "分析第 ${index + 1} / $total 个局面"
-                        )
-                    }
-                    positionAnalyses.add(
-                        container.engine.analyze(
-                            maxVisits = visits,
-                            intervalMs = 300,
-                            durationMs = 450,
-                            turn = turn
-                        )
+                    container.engine.newGame(
+                        record.size,
+                        record.komi,
+                        visits,
+                        record.handicap.coerceAtLeast(0)
                     )
-                    if (index < record.moves.size) {
-                        val move = record.moves[index]
+                    record.moves.take(selectedIndex).forEach { move ->
                         container.engine.play(move.color, move.point)
                     }
                 }
-                val moveAnalyses = buildMoveAnalyses(record, positionAnalyses)
-                val result = GameAnalysis(
-                    sgfHash = AnalysisStore.sha256(file.readText(Charsets.UTF_8)),
-                    boardSize = record.size,
-                    visits = visits,
-                    moves = moveAnalyses
+                val turn = if (selectedIndex < record.moves.size) {
+                    record.moves[selectedIndex].color
+                } else {
+                    record.moves.lastOrNull()?.color?.opponent ?: StoneColor.BLACK
+                }
+                val analysis = container.engine.analyze(
+                    maxVisits = visits,
+                    intervalMs = 250,
+                    durationMs = 900,
+                    turn = turn,
+                    includeOwnership = false
                 )
-                withContext(Dispatchers.IO) { AnalysisStore.save(file, result) }
+                if (_state.value.selectedIndex != selectedIndex) return@launch
                 _state.update {
                     it.copy(
-                        analysis = result,
                         analyzing = false,
                         progress = 1f,
-                        message = "复盘完成，已保存配套 JSON",
-                        selectedIndex = 1.coerceAtMost(it.positions.lastIndex),
-                        board = it.positions.getOrNull(1) ?: it.positions.first(),
-                        selectedMove = moveAnalyses.firstOrNull(),
-                        ownership = moveAnalyses.firstOrNull()?.ownership.orEmpty(),
-                        candidates = moveAnalyses.firstOrNull()?.candidates.orEmpty()
+                        candidates = analysis.candidates.take(5),
+                        ownership = analysis.ownership,
+                        analysisVisits = analysis.visits,
+                        message = "当前局面分析完成（${analysis.visits} visits）"
                     )
                 }
             } catch (t: Throwable) {
+                if (_state.value.selectedIndex != selectedIndex) return@launch
                 _state.update {
                     it.copy(
                         analyzing = false,
-                        error = "自动复盘失败: ${t.message}",
+                        error = "当前局面分析失败: ${t.message}",
                         message = null
                     )
                 }
@@ -304,42 +304,4 @@ class ReviewViewModel(
         return result
     }
 
-    private fun buildMoveAnalyses(
-        record: GameRecord,
-        analyses: List<PositionAnalysis>
-    ): List<MoveAnalysis> {
-        return record.moves.mapIndexed { index, move ->
-            val before = analyses.getOrNull(index)?.best
-            val after = analyses.getOrNull(index + 1)?.best
-            val beforeWinrate = before?.winrate ?: 0.5
-            val afterWinrate = after?.winrate ?: beforeWinrate
-            val beforeScore = before?.scoreLead ?: 0.0
-            val afterScore = after?.scoreLead ?: beforeScore
-            val blackLoss = beforeWinrate - afterWinrate
-            val loss = if (move.color == StoneColor.BLACK) blackLoss else -blackLoss
-            val scoreLoss = if (move.color == StoneColor.BLACK) {
-                beforeScore - afterScore
-            } else {
-                afterScore - beforeScore
-            }
-            MoveAnalysis(
-                moveNumber = index + 1,
-                color = move.color,
-                playedMove = move.point,
-                winrateBefore = beforeWinrate,
-                scoreLeadBefore = beforeScore,
-                winrateAfter = afterWinrate,
-                scoreLeadAfter = afterScore,
-                loss = loss,
-                isBlunder = loss > BLUNDER_THRESHOLD || abs(scoreLoss) > 4.0,
-                comment = if (loss > BLUNDER_THRESHOLD) "明显亏损的一手" else "",
-                ownership = analyses.getOrNull(index + 1)?.ownership.orEmpty(),
-                candidates = analyses.getOrNull(index)?.candidates.orEmpty()
-            )
-        }
-    }
-
-    companion object {
-        private const val BLUNDER_THRESHOLD = 0.12
-    }
 }
