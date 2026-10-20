@@ -37,6 +37,7 @@ fun GoBoard(
     showCoordinates: Boolean = true,
     ownership: List<Float> = emptyList(),
     showOwnership: Boolean = false,
+    ownershipThreshold: Float = 0.08f,
     candidates: List<CandidateMove> = emptyList(),
     onIntersectionTap: (GoPoint) -> Unit = {}
 ) {
@@ -79,7 +80,7 @@ fun GoBoard(
             for (y in 0 until boardSize) {
                 for (x in 0 until boardSize) {
                     val value = ownership[y * boardSize + x]
-                    if (abs(value) < 0.08f) continue
+                    if (abs(value) < ownershipThreshold) continue
                     val center = point(x, y)
                     val half = cell * 0.46f
                     val strength = abs(value).coerceIn(0f, 1f)

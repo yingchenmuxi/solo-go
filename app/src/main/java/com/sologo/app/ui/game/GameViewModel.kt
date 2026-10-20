@@ -6,23 +6,19 @@ import androidx.lifecycle.viewModelScope
 import com.sologo.app.data.SettingsRepository
 import com.sologo.app.data.SgfRepository
 import com.sologo.core.model.BoardPosition
-import com.sologo.core.model.CandidateMove
 import com.sologo.core.model.GameRecord
 import com.sologo.core.model.GameRules
+import com.sologo.core.model.GoCoordinates
 import com.sologo.core.model.GoPoint
 import com.sologo.core.model.HandicapOptions
 import com.sologo.core.model.HandicapStones
 import com.sologo.core.model.MoveRecord
-import com.sologo.core.model.PositionAnalysis
+import com.sologo.core.model.ScoreSummary
 import com.sologo.core.model.StoneColor
-import com.sologo.core.model.TerritorySummary
 import com.sologo.engine.BatteryTemperatureMonitor
 import com.sologo.engine.EngineConnectionLostException
 import com.sologo.engine.EngineState
 import com.sologo.engine.KataGoEngine
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -50,16 +46,10 @@ data class GameUiState(
     val lastAiSeconds: Int? = null,
     val started: Boolean = false,
     val gameOver: Boolean = false,
-    val advancedAccess: Boolean = false,
-    val autoAnalyzeEnabled: Boolean = false,
-    val analysisVisible: Boolean = false,
-    val showPaywall: Boolean = false,
-    val analysis: PositionAnalysis? = null,
-    val candidates: List<CandidateMove> = emptyList(),
-    val ownership: List<Float> = emptyList(),
-    val territory: TerritorySummary? = null,
-    val winrate: Double? = null,
-    val scoreLead: Double? = null,
+    val scoreVisible: Boolean = false,
+    val scoreMarkers: List<Float> = emptyList(),
+    val scoreSummary: ScoreSummary? = null,
+    val scoreResult: String? = null,
     val batteryTemp: Float? = null,
     val highTemp: Boolean = false,
     val error: String? = null
@@ -85,7 +75,6 @@ class GameViewModel(
     val events: SharedFlow<GameEvent> = _events.asSharedFlow()
 
     private val positionHistory = mutableListOf<BoardPosition>()
-    private var analysisJob: Job? = null
     private var isForeground = false
 
     init {
@@ -122,16 +111,6 @@ class GameViewModel(
                     ) {
                         maybeAiMove()
                     }
-                }
-            }
-        }
-        viewModelScope.launch {
-            settings.settings.collect { s ->
-                _uiState.update {
-                    it.copy(
-                        advancedAccess = s.hasAdvancedAccess(),
-                        autoAnalyzeEnabled = s.autoAnalyze
-                    )
                 }
             }
         }
@@ -178,14 +157,10 @@ class GameViewModel(
                     started = true,
                     gameOver = false,
                     lastAiSeconds = null,
-                    autoAnalyzeEnabled = currentSettings.autoAnalyze,
-                    analysisVisible = false,
-                    analysis = null,
-                    candidates = emptyList(),
-                    ownership = emptyList(),
-                    territory = null,
-                    winrate = null,
-                    scoreLead = null
+                    scoreVisible = false,
+                    scoreMarkers = emptyList(),
+                    scoreSummary = null,
+                    scoreResult = null
                 )
             }
             positionHistory.clear()
@@ -302,128 +277,15 @@ class GameViewModel(
                         gameOver = false,
                         lastAiSeconds = null,
                         status = "已悔棋，请重新落子",
-                        analysis = null,
-                        candidates = emptyList(),
-                        ownership = emptyList(),
-                        territory = null,
-                        winrate = null,
-                        scoreLead = null
+                        scoreVisible = false,
+                        scoreMarkers = emptyList(),
+                        scoreSummary = null,
+                        scoreResult = null
                     )
                 }
             } catch (t: Throwable) {
                 _uiState.update { it.copy(busy = false, status = "悔棋失败", error = t.message) }
             }
-        }
-    }
-
-    fun analyzeNow() {
-        val state = _uiState.value
-        if (!state.started || state.gameOver) return
-        if (!state.advancedAccess) {
-            _uiState.update { it.copy(showPaywall = true) }
-            return
-        }
-        if (state.highTemp) {
-            _events.tryEmit(GameEvent.Message("电池温度过高，已暂停 AI 搜索"))
-            return
-        }
-        if (state.busy) {
-            _events.tryEmit(GameEvent.Message("KataGo 正在处理上一项操作，请稍后"))
-            return
-        }
-        analysisJob?.cancel()
-        analysisJob = viewModelScope.launch {
-            _uiState.update { it.copy(analysisVisible = true, status = "KataGo 思考中…") }
-            try {
-                val visits = settings.settings.first().aiLevel.visits.coerceAtLeast(20)
-                val analysis = analyzeCurrentPosition(
-                    visits = visits,
-                    intervalMs = 300,
-                    durationMs = 700
-                )
-                val summary = TerritorySummary.fromOwnership(
-                    ownership = analysis.ownership,
-                    boardSize = _uiState.value.boardSize,
-                    komi = _uiState.value.komi
-                )
-                _uiState.update {
-                    it.copy(
-                        status = "分析完成（${analysis.visits} visits）",
-                        analysisVisible = true,
-                        analysis = analysis,
-                        candidates = analysis.candidates,
-                        ownership = analysis.ownership,
-                        territory = summary,
-                        scoreLead = summary?.lead ?: analysis.blackScoreLead,
-                        winrate = analysis.blackWinrate,
-                    )
-                }
-            } catch (t: CancellationException) {
-                throw t
-            } catch (t: Throwable) {
-                _uiState.update {
-                    it.copy(
-                        status = if (t is EngineConnectionLostException) {
-                            "引擎连接已断开，请重新点击局势分析"
-                        } else {
-                            "分析失败"
-                        },
-                        error = if (t is EngineConnectionLostException) null else t.message,
-                        analysisVisible = false,
-                        analysis = null,
-                        candidates = emptyList(),
-                        ownership = emptyList(),
-                        territory = null,
-                        winrate = null,
-                        scoreLead = null
-                    )
-                }
-            }
-        }
-    }
-
-    /** 控制分析图层是否可见；关闭会取消正在运行的分析并清空热力/候选层。 */
-    fun toggleAnalysis() {
-        val state = _uiState.value
-        if (!state.started) return
-        if (!state.advancedAccess) {
-            _uiState.update { it.copy(showPaywall = true) }
-            return
-        }
-        if (state.analysisVisible) {
-            analysisJob?.cancel()
-            viewModelScope.launch { settings.setAutoAnalyze(false) }
-            _uiState.update {
-                it.copy(
-                    analysisVisible = false,
-                    autoAnalyzeEnabled = false,
-                    analysis = null,
-                    candidates = emptyList(),
-                    ownership = emptyList(),
-                    territory = null,
-                    winrate = null,
-                    scoreLead = null,
-                    status = "AI 分析已关闭"
-                )
-            }
-        } else {
-            if (state.busy) {
-                _events.tryEmit(GameEvent.Message("KataGo 正在思考，请稍后再分析"))
-                return
-            }
-            _uiState.update { it.copy(analysisVisible = true) }
-            analyzeNow()
-        }
-    }
-
-    fun dismissPaywall() {
-        _uiState.update { it.copy(showPaywall = false) }
-    }
-
-    fun unlockWithPurchase() {
-        viewModelScope.launch {
-            settings.setPremiumUnlocked(true)
-            _uiState.update { it.copy(showPaywall = false, advancedAccess = true) }
         }
     }
 
@@ -463,7 +325,12 @@ class GameViewModel(
         }
     }
 
-    /** 让 KataGo 做终局数子；结果只作为学习参考，不替代正式比赛裁判。 */
+    /**
+     * 让 KataGo 做终局数子。
+     *
+     * 先用 final_score 得到正式结果，再用 ownership 标出黑白地盘。
+     * 数子结果只作为学习参考，不替代正式比赛裁判。
+     */
     fun countScore() {
         val state = _uiState.value
         if (!state.started) {
@@ -475,14 +342,75 @@ class GameViewModel(
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(busy = true, status = "KataGo 正在数子…") }
+            _uiState.update {
+                it.copy(
+                    busy = true,
+                    status = "KataGo 正在数子…",
+                    error = null,
+                    scoreVisible = false,
+                    scoreMarkers = emptyList(),
+                    scoreSummary = null,
+                    scoreResult = null
+                )
+            }
             try {
-                val result = engine.finalScore()
+                if (!engine.isRunning()) {
+                    restoreEngineForPosition(state)
+                }
+                val result = engine.finalScore().trim()
                 if (result.isBlank()) {
                     throw IllegalStateException("KataGo 没有返回数子结果")
                 }
+
+                // 去掉死子后再标记地盘；final_status_list 失败时退回当前棋盘。
+                val deadStones = runCatching { engine.finalStatusList("dead") }
+                    .getOrDefault("")
+                    .split(Regex("\\s+"))
+                    .mapNotNull { GoCoordinates.parseGtp(it, state.boardSize) }
+                    .toSet()
+                val scoringBoard = if (deadStones.isEmpty()) {
+                    state.board
+                } else {
+                    state.board.copy(stones = state.board.stones - deadStones)
+                }
+
+                val visits = settings.settings.first().aiLevel.analysisVisits.coerceAtLeast(200)
+                var summary: ScoreSummary? = null
+                var markers: List<Float> = emptyList()
+                runCatching {
+                    engine.analyze(
+                        maxVisits = visits,
+                        intervalMs = 250,
+                        durationMs = 1_000,
+                        turn = state.turn
+                    )
+                }.onSuccess { analysis ->
+                    summary = ScoreSummary.fromOwnership(
+                        ownership = analysis.ownership,
+                        scoringBoard = scoringBoard,
+                        komi = state.komi
+                    )
+                    markers = ScoreSummary.emptyPointMarkers(
+                        ownership = analysis.ownership,
+                        scoringBoard = scoringBoard
+                    )
+                }
+
                 _uiState.update {
-                    it.copy(busy = false, gameOver = true, status = "终局数子：$result")
+                    it.copy(
+                        busy = false,
+                        gameOver = true,
+                        board = scoringBoard,
+                        scoreVisible = true,
+                        scoreMarkers = markers,
+                        scoreSummary = summary,
+                        scoreResult = result,
+                        status = if (summary == null) {
+                            "数子完成（地盘标记未获取）"
+                        } else {
+                            "数子完成"
+                        }
+                    )
                 }
             } catch (t: Throwable) {
                 _uiState.update {
@@ -530,10 +458,9 @@ class GameViewModel(
         }
     }
 
-    /** App 进入后台时先停掉分析协程；KataGo 进程本身由 Application 统一销毁。 */
+    /** App 进入后台时禁止重建引擎；KataGo 进程本身由 Application 统一销毁。 */
     fun onBackground() {
         isForeground = false
-        analysisJob?.cancel()
     }
 
     /**
@@ -562,37 +489,6 @@ class GameViewModel(
             if (!move.comment.contains("认输")) {
                 engine.play(move.color, move.point)
             }
-        }
-    }
-
-    /**
-     * 分析前确认引擎仍对应当前局面；如果 KataGo 子进程在后台被销毁，
-     * 先按棋谱恢复，再重试一次，避免把 Java 的 "Stream Closed" 直接展示给用户。
-     */
-    private suspend fun analyzeCurrentPosition(
-        visits: Int,
-        intervalMs: Int,
-        durationMs: Long
-    ): PositionAnalysis {
-        if (!engine.isRunning()) {
-            restoreEngineForPosition(_uiState.value)
-        }
-        return try {
-            engine.analyze(
-                maxVisits = visits,
-                intervalMs = intervalMs,
-                durationMs = durationMs,
-                turn = _uiState.value.turn
-            )
-        } catch (t: EngineConnectionLostException) {
-            if (!isForeground) throw t
-            restoreEngineForPosition(_uiState.value)
-            engine.analyze(
-                maxVisits = visits,
-                intervalMs = intervalMs,
-                durationMs = durationMs,
-                turn = _uiState.value.turn
-            )
         }
     }
 
@@ -641,12 +537,8 @@ class GameViewModel(
                 return
             }
             applyMove(aiColor, generated.point)
-            if (_uiState.value.advancedAccess && _uiState.value.autoAnalyzeEnabled) {
-                launchAnalysisAfterMove()
-            } else {
-                _uiState.update {
-                    it.copy(busy = false, status = "轮到你落子")
-                }
+            _uiState.update {
+                it.copy(busy = false, status = "轮到你落子")
             }
         } catch (t: Throwable) {
             val elapsedSeconds = ((SystemClock.elapsedRealtime() - thinkingStartedAt) / 1_000).toInt()
@@ -674,55 +566,12 @@ class GameViewModel(
                 moves = nextMoves,
                 turn = color.opponent,
                 busy = true,
-                analysisVisible = false,
-                analysis = null,
-                candidates = emptyList(),
-                ownership = emptyList(),
-                territory = null,
-                winrate = null,
-                scoreLead = null,
+                scoreVisible = false,
+                scoreMarkers = emptyList(),
+                scoreSummary = null,
+                scoreResult = null,
                 status = if (color == it.humanColor) "KataGo 正在思考…" else "轮到你落子"
             )
-        }
-    }
-
-    private fun launchAnalysisAfterMove() {
-        analysisJob?.cancel()
-        analysisJob = viewModelScope.launch {
-            delay(120)
-            if (_uiState.value.highTemp) {
-                _uiState.update { it.copy(busy = false, status = "温度过高，已暂停 AI 分析") }
-                return@launch
-            }
-            try {
-                val analysis = analyzeCurrentPosition(
-                    visits = settings.settings.first().aiLevel.visits.coerceAtLeast(20),
-                    intervalMs = 300,
-                    durationMs = 450
-                )
-                val summary = TerritorySummary.fromOwnership(
-                    ownership = analysis.ownership,
-                    boardSize = _uiState.value.boardSize,
-                    komi = _uiState.value.komi
-                )
-                _uiState.update {
-                    it.copy(
-                        busy = false,
-                        analysisVisible = true,
-                        analysis = analysis,
-                        candidates = analysis.candidates,
-                        ownership = analysis.ownership,
-                        territory = summary,
-                        scoreLead = summary?.lead ?: analysis.blackScoreLead,
-                        winrate = analysis.blackWinrate,
-                        status = "轮到你落子"
-                    )
-                }
-            } catch (_: Throwable) {
-                _uiState.update {
-                    it.copy(busy = false, analysisVisible = false, status = "轮到你落子")
-                }
-            }
         }
     }
 

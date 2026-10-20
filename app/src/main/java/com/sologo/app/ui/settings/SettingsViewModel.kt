@@ -23,10 +23,6 @@ class SettingsViewModel(
         container.settings.setBoardSize(value)
     }
 
-    fun setAutoAnalyze(value: Boolean) = viewModelScope.launch {
-        container.settings.setAutoAnalyze(value)
-    }
-
     fun setHumanColor(value: StoneColor) = viewModelScope.launch {
         container.settings.setHumanColor(value)
     }

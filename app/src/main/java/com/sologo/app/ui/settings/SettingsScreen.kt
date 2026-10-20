@@ -14,7 +14,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -57,35 +56,6 @@ fun SettingsScreen(
                 .padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text("AI 分析", style = MaterialTheme.typography.titleSmall)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "每次 AI 落子后自动分析",
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.weight(1f)
-                        )
-                        FilterChip(
-                            selected = settings.autoAnalyze,
-                            onClick = { vm.setAutoAnalyze(!settings.autoAnalyze) },
-                            label = { Text(if (settings.autoAnalyze) "开" else "关") }
-                        )
-                    }
-                    Text(
-                        "自动分析由首页 AI 等级控制。",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(10.dp),
