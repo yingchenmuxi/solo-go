@@ -78,6 +78,8 @@ sgf/
 
 如果数子前 App 切后台导致 KataGo 子进程被销毁，重新进入对局后会按当前棋谱重建引擎，再继续数子；数子过程不会在后台启动新进程。
 
+对局中每次实际落子都会播放短促的木石落子音效，人类和 KataGo 落子均生效；停一手和悔棋不播放。音效使用 SoundPool 低延迟播放，并遵循系统媒体音量与静音设置。
+
 设置页新增“对局结束后自动保存”。打开后，人类认输、KataGo 认输或数子完成时会自动把标准 SGF 保存到应用内棋谱目录；SGF 的 `DT` 记录对局日期，复盘列表同时显示精确保存时间、路数、手数和结果。复盘页会自动列出已存储对局，点击即可开始复盘，并支持开局/上一手/下一手/末手、进度条，以及“分析当前手”后显示前 5 个推荐点、胜率、目数和 PV。
 
 App 图标已替换为设计稿 **B · 双石 / S-Stone**：深蓝棋盘背景、青绿色 S 形轨迹与黑白双石。矢量源文件位于 `design/logo-options/option-b-s-stone.svg`，并已生成 Adaptive Icon 前景、背景、单色主题图标及各密度传统图标。
@@ -115,12 +117,12 @@ SDK 至少需要 `platforms;android-37.0` 和 `build-tools;37.0.0`（AGP 也可�
 .\gradlew.bat :app:assembleDebug
 ```
 
-产物为 `app/build/outputs/apk/debug/app-debug.apk`（约 147MB，SHA256 `FF0B4F4AFFAF7B151AF2FE5E54D55AA1DB4C12DAF795600C28E9D1D372D08D82`）。APK 内已确认包含 `lib/arm64-v8a/libkatago.so`、普通权重、HumanSL 权重、`gtp.cfg` 和 MD5 清单。由于当前没有连接 arm64 真机/模拟器，尚未验证实际设备上的进程执行和触摸体验；这一步需要在 Android 10+ arm64 真机上安装 APK 后完成。
+产物为 `app/build/outputs/apk/debug/app-debug.apk`（约 147MB，SHA256 `1B11592BCEB26823B261C3A2355C734F38461ADD97A76FC114754D960BB6E7D5`）。APK 内已确认包含 `lib/arm64-v8a/libkatago.so`、普通权重、HumanSL 权重、`gtp.cfg` 和 MD5 清单。由于当前没有连接 arm64 真机/模拟器，尚未验证实际设备上的进程执行和触摸体验；这一步需要在 Android 10+ arm64 真机上安装 APK 后完成。
 
 每次执行 `assembleDebug` 后还会自动生成一份带北京时间戳的副本，例如：
 
 ```
-app/build/outputs/apk/debug/sologo_20261020_203240.apk
+app/build/outputs/apk/debug/sologo_20261020_204346.apk
 ```
 
 原始 `app-debug.apk` 仍保留，Android Studio 的 Run/Install 流程不受影响。`assembleRelease` 也会在 release 目录生成同样的 `sologo_日期_时间.apk`。

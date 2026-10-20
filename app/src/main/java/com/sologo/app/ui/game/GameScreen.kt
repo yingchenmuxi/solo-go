@@ -348,7 +348,8 @@ private class GameViewModelFactory(
             engine = container.engine,
             settings = container.settings,
             sgfRepository = container.sgfRepository,
-            battery = container.battery
+            battery = container.battery,
+            moveSound = container.moveSound
         ) as T
     }
 }

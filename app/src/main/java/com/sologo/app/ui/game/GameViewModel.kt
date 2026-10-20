@@ -3,6 +3,7 @@ package com.sologo.app.ui.game
 import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sologo.app.audio.MoveSoundPlayer
 import com.sologo.app.data.SettingsRepository
 import com.sologo.app.data.SgfRepository
 import com.sologo.core.model.BoardPosition
@@ -71,7 +72,8 @@ class GameViewModel(
     private val engine: KataGoEngine,
     private val settings: SettingsRepository,
     private val sgfRepository: SgfRepository,
-    private val battery: BatteryTemperatureMonitor
+    private val battery: BatteryTemperatureMonitor,
+    private val moveSound: MoveSoundPlayer
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
@@ -630,6 +632,9 @@ class GameViewModel(
         positionHistory.add(nextBoard)
         val move = MoveRecord(color, point, moveNumber = current.moves.size + 1)
         val nextMoves = current.moves + move
+        if (point != null && nextBoard.stoneAt(point) == color) {
+            moveSound.play(color)
+        }
         _uiState.update {
             it.copy(
                 board = nextBoard,

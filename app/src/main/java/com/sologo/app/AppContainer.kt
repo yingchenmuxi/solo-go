@@ -1,6 +1,7 @@
 package com.sologo.app
 
 import android.app.Application
+import com.sologo.app.audio.MoveSoundPlayer
 import com.sologo.app.data.SettingsRepository
 import com.sologo.app.data.SgfRepository
 import com.sologo.app.monetization.BillingRepository
@@ -21,6 +22,7 @@ class AppContainer(application: Application) {
     val sgfRepository = SgfRepository(application)
     val engine = KataGoEngine(application)
     val battery = BatteryTemperatureMonitor(application)
+    val moveSound = MoveSoundPlayer(application)
     val billing = BillingRepository(application) { unlocked ->
         appScope.launch { settings.setPremiumUnlocked(unlocked) }
     }
