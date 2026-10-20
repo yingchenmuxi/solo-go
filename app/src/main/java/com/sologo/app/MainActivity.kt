@@ -75,8 +75,8 @@ private data class TabItem(val route: String, val label: String, val icon: Int)
 
 private val tabs = listOf(
     TabItem("home", "对弈", R.drawable.ic_home),
-    TabItem("review", "复盘", R.drawable.ic_account_box),
-    TabItem("settings", "设置", R.drawable.ic_account_box)
+    TabItem("review", "复盘", R.drawable.ic_review),
+    TabItem("settings", "设置", R.drawable.ic_settings)
 )
 
 @Composable
