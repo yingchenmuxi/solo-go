@@ -5,19 +5,25 @@ import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
@@ -33,6 +39,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
@@ -41,6 +49,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sologo.app.AppContainer
+import com.sologo.app.R
 import com.sologo.app.ui.components.GoBoard
 import com.sologo.app.ui.components.PaywallDialog
 import kotlinx.coroutines.flow.collect
@@ -177,40 +186,56 @@ fun ReviewDetailScreen(
                     valueRange = 0f..state.moveCount.coerceAtLeast(1).toFloat(),
                     steps = (state.moveCount - 1).coerceAtLeast(0)
                 )
-                Row(
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    shape = RoundedCornerShape(50),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                    )
                 ) {
-                    OutlinedButton(
-                        onClick = { vm.selectIndex(0) },
-                        enabled = state.selectedIndex > 0,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("开局") }
-                    OutlinedButton(
-                        onClick = { vm.selectIndex(state.selectedIndex - 1) },
-                        enabled = state.selectedIndex > 0,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("上一手") }
-                    OutlinedButton(
-                        onClick = { vm.selectIndex(state.selectedIndex + 1) },
-                        enabled = state.selectedIndex < state.moveCount,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("下一手") }
-                    OutlinedButton(
-                        onClick = { vm.selectIndex(state.moveCount) },
-                        enabled = state.selectedIndex < state.moveCount,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("末手") }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MoveControl(
+                            iconRes = R.drawable.ic_first_move,
+                            description = "开局",
+                            enabled = state.selectedIndex > 0,
+                            onClick = { vm.selectIndex(0) }
+                        )
+                        MoveControl(
+                            iconRes = R.drawable.ic_prev_move,
+                            description = "上一手",
+                            enabled = state.selectedIndex > 0,
+                            onClick = { vm.selectIndex(state.selectedIndex - 1) }
+                        )
+                        MoveControl(
+                            iconRes = R.drawable.ic_next_move,
+                            description = "下一手",
+                            enabled = state.selectedIndex < state.moveCount,
+                            onClick = { vm.selectIndex(state.selectedIndex + 1) }
+                        )
+                        MoveControl(
+                            iconRes = R.drawable.ic_last_move,
+                            description = "末手",
+                            enabled = state.selectedIndex < state.moveCount,
+                            onClick = { vm.selectIndex(state.moveCount) }
+                        )
+                    }
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
                         onClick = vm::analyzeCurrent,
                         enabled = !state.analyzing && state.advancedAccess && !state.highTemp,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.height(36.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) {
                         Text(if (state.advancedAccess) "分析当前手" else "解锁当前手分析")
                     }
@@ -221,7 +246,10 @@ fun ReviewDetailScreen(
                             state.candidates.isNotEmpty() -> "推荐 ${state.candidates.size} 个点"
                             else -> "尚未分析当前手"
                         },
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
                 }
                 if (state.analyzing) {
@@ -249,6 +277,31 @@ fun ReviewDetailScreen(
                 }
             },
             onDismiss = vm::dismissPaywall
+        )
+    }
+}
+
+@Composable
+private fun MoveControl(
+    iconRes: Int,
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(40.dp)
+    ) {
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = description,
+            modifier = Modifier.size(20.dp),
+            tint = if (enabled) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.32f)
+            }
         )
     }
 }
