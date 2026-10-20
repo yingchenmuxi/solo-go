@@ -303,16 +303,16 @@ class KataGoEngine(
         // KataGo 的 kata-analyze 可能在同一行连续输出多个 "info" 记录，
         // 因此不能按“一行一个候选”解析；这里按 info 分段，并用 order 去重保留最新值。
         val candidateByOrder = linkedMapOf<Int, CandidateMove>()
-        var ownership = emptyList<Float>()
+        var ownership = parseFullOwnership(lines.joinToString(" "), turn).orEmpty()
         var totalVisits = 0
         for (line in lines) {
-            // ownership 可能位于 rootInfo 顶层字段行，必须独立于候选着法解析。
-            parseFullOwnership(line, turn)?.let { ownership = it }
             line.split(" info ").forEachIndexed { index, segment ->
                 val normalized = if (segment.startsWith("info ")) segment else "info $segment"
                 val parsed = parseInfoLine(normalized, turn) ?: return@forEachIndexed
                 candidateByOrder[parsed.order] = parsed
-                if (parsed.ownership.isNotEmpty()) ownership = parsed.ownership
+                if (ownership.isEmpty() && parsed.ownership.isNotEmpty()) {
+                    ownership = parsed.ownership
+                }
                 totalVisits = maxOf(totalVisits, parsed.visits)
             }
         }
@@ -382,21 +382,22 @@ class KataGoEngine(
 
     private fun parseFullOwnership(line: String, turn: StoneColor): List<Float>? {
         val tokens = line.trim().split(Regex("\\s+"))
-        val start = tokens.indexOf("ownership")
-        if (start < 0) return null
         val expected = boardSize * boardSize
-        val values = ArrayList<Float>(expected)
-        var index = start + 1
-        while (index < tokens.size && values.size < expected) {
-            val value = tokens[index].toFloatOrNull() ?: break
-            values.add(value)
-            index++
+        var result: List<Float>? = null
+        for (start in tokens.indices) {
+            if (tokens[start] != "ownership") continue
+            val values = ArrayList<Float>(expected)
+            var index = start + 1
+            while (index < tokens.size && values.size < expected) {
+                val value = tokens[index].toFloatOrNull() ?: break
+                values.add(value)
+                index++
+            }
+            if (values.size == expected) {
+                result = normalizeOwnershipToBlack(values, turn)
+            }
         }
-        return if (values.size == expected) {
-            normalizeOwnershipToBlack(values, turn)
-        } else {
-            null
-        }
+        return result
     }
 
     private fun candidatesFallbackOrder(visits: Int): Int = 10_000 - visits.coerceAtMost(10_000)

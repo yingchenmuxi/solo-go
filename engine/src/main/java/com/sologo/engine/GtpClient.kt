@@ -154,7 +154,8 @@ class GtpClient(
                 val line = withTimeoutOrNull(remaining) {
                     lines.receiveCatching().getOrNull()
                 } ?: break
-                if (line.isBlank()) break
+                // kata-analyze 可能在字段之间输出空行，不能把它当成流结束。
+                if (line.isBlank()) continue
                 // kata-analyze 的 rootInfo/ownership 可能位于独立的顶层字段行，
                 // 不能只保留以 info 开头的候选着法行。
                 output.add(line)
