@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="deepSpace" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0C1C2B"/>
+      <stop offset="0.55" stop-color="#07111D"/>
+      <stop offset="1" stop-color="#03070E"/>
+    </linearGradient>
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#34D8D0" stop-opacity="0.34"/>
+      <stop offset="0.55" stop-color="#2A8FFF" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#06111D" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="aiStone" cx="34%" cy="27%" r="78%">
+      <stop offset="0" stop-color="#5B7386"/>
+      <stop offset="0.33" stop-color="#172635"/>
+      <stop offset="1" stop-color="#010408"/>
+    </radialGradient>
+    <filter id="cyanGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="tileD">
+      <rect width="1024" height="1024" rx="230"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#tileD)">
+    <rect width="1024" height="1024" fill="url(#deepSpace)"/>
+    <circle cx="512" cy="512" r="470" fill="url(#coreGlow)"/>
+    <g stroke="#4EF0DF" stroke-width="6" opacity="0.28" filter="url(#cyanGlow)">
+      <path d="M180 180H844M180 291H844M180 402H844M180 512H844M180 622H844M180 733H844M180 844H844"/>
+      <path d="M180 180V844M291 180V844M402 180V844M512 180V844M622 180V844M733 180V844M844 180V844"/>
+    </g>
+    <g stroke="#63FFF0" stroke-width="14" stroke-linecap="round" opacity="0.72" filter="url(#cyanGlow)">
+      <path d="M512 144V300M512 724V880M144 512H300M724 512H880"/>
+    </g>
+    <circle cx="512" cy="512" r="184" fill="url(#aiStone)" stroke="#3FF0E1" stroke-width="14" filter="url(#cyanGlow)"/>
+    <ellipse cx="453" cy="446" rx="58" ry="34" fill="#FFFFFF" opacity="0.22" transform="rotate(-28 453 446)"/>
+    <circle cx="571" cy="570" r="15" fill="#AFFFF7"/>
+    <g fill="#7FFFF4" opacity="0.90" filter="url(#cyanGlow)">
+      <circle cx="291" cy="291" r="10"/>
+      <circle cx="733" cy="291" r="10"/>
+      <circle cx="291" cy="733" r="10"/>
+      <circle cx="733" cy="733" r="10"/>
+    </g>
+  </g>
+  <rect x="18" y="18" width="988" height="988" rx="216" fill="none" stroke="#59FFF0" stroke-width="10" opacity="0.22"/>
+</svg>
