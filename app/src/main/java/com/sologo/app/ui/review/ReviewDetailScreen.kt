@@ -162,37 +162,6 @@ fun ReviewDetailScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Slider(
-                            value = state.selectedIndex.toFloat(),
-                            onValueChange = { vm.selectIndex(it.roundToInt()) },
-                            valueRange = 0f..state.moveCount.coerceAtLeast(1).toFloat(),
-                            steps = (state.moveCount - 1).coerceAtLeast(0)
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { vm.selectIndex(0) },
-                                enabled = state.selectedIndex > 0,
-                                modifier = Modifier.weight(1f)
-                            ) { Text("开局") }
-                            OutlinedButton(
-                                onClick = { vm.selectIndex(state.selectedIndex - 1) },
-                                enabled = state.selectedIndex > 0,
-                                modifier = Modifier.weight(1f)
-                            ) { Text("上一手") }
-                            OutlinedButton(
-                                onClick = { vm.selectIndex(state.selectedIndex + 1) },
-                                enabled = state.selectedIndex < state.moveCount,
-                                modifier = Modifier.weight(1f)
-                            ) { Text("下一手") }
-                            OutlinedButton(
-                                onClick = { vm.selectIndex(state.moveCount) },
-                                enabled = state.selectedIndex < state.moveCount,
-                                modifier = Modifier.weight(1f)
-                            ) { Text("末手") }
-                        }
                     }
                 }
                 GoBoard(
@@ -202,6 +171,37 @@ fun ReviewDetailScreen(
                     showOwnership = state.advancedAccess && state.ownership.isNotEmpty(),
                     candidates = if (state.advancedAccess) state.candidates else emptyList()
                 )
+                Slider(
+                    value = state.selectedIndex.toFloat(),
+                    onValueChange = { vm.selectIndex(it.roundToInt()) },
+                    valueRange = 0f..state.moveCount.coerceAtLeast(1).toFloat(),
+                    steps = (state.moveCount - 1).coerceAtLeast(0)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { vm.selectIndex(0) },
+                        enabled = state.selectedIndex > 0,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("开局") }
+                    OutlinedButton(
+                        onClick = { vm.selectIndex(state.selectedIndex - 1) },
+                        enabled = state.selectedIndex > 0,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("上一手") }
+                    OutlinedButton(
+                        onClick = { vm.selectIndex(state.selectedIndex + 1) },
+                        enabled = state.selectedIndex < state.moveCount,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("下一手") }
+                    OutlinedButton(
+                        onClick = { vm.selectIndex(state.moveCount) },
+                        enabled = state.selectedIndex < state.moveCount,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("末手") }
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),

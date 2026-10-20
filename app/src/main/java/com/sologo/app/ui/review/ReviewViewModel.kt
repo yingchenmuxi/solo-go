@@ -168,6 +168,9 @@ class ReviewViewModel(
         val state = _state.value
         if (state.positions.isEmpty()) return
         val safe = index.coerceIn(0, state.positions.lastIndex)
+        if (safe != state.selectedIndex) {
+            state.record?.moves?.getOrNull(safe - 1)?.color?.let(container.moveSound::play)
+        }
         analysisJob?.cancel()
         _state.update {
             it.copy(
