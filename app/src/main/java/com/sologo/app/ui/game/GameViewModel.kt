@@ -86,6 +86,7 @@ class GameViewModel(
 
     private val positionHistory = mutableListOf<BoardPosition>()
     private var analysisJob: Job? = null
+    private var isForeground = false
 
     init {
         battery.start()
@@ -502,6 +503,7 @@ class GameViewModel(
      * 这里按已有棋谱重放一遍，既保证“后台不耗电”，也尽量不丢当前对局。
      */
     fun onForeground() {
+        isForeground = true
         battery.start()
         val state = _uiState.value
         if (!state.started || state.gameOver) return
@@ -513,7 +515,8 @@ class GameViewModel(
                 _uiState.update {
                     it.copy(
                         busy = false,
-                        status = if (it.turn == it.humanColor) "引擎已恢复，请继续" else "AI 继续思考…"
+                        status = if (it.turn == it.humanColor) "引擎已恢复，请继续" else "AI 继续思考…",
+                        error = null
                     )
                 }
                 if (_uiState.value.turn != _uiState.value.humanColor) {
@@ -527,6 +530,12 @@ class GameViewModel(
         }
     }
 
+    /** App 进入后台时先停掉分析协程；KataGo 进程本身由 Application 统一销毁。 */
+    fun onBackground() {
+        isForeground = false
+        analysisJob?.cancel()
+    }
+
     /**
      * 按当前棋谱重建 GTP 进程。
      *
@@ -534,6 +543,9 @@ class GameViewModel(
      * 必须重新 initialize，并用 play/让子摆子把局面恢复到当前手。
      */
     private suspend fun restoreEngineForPosition(state: GameUiState) {
+        if (!isForeground) {
+            throw EngineConnectionLostException("应用不在前台，已跳过引擎重建")
+        }
         engine.shutdownNow()
         val current = settings.settings.first()
         engine.initialize()
@@ -573,6 +585,7 @@ class GameViewModel(
                 turn = _uiState.value.turn
             )
         } catch (t: EngineConnectionLostException) {
+            if (!isForeground) throw t
             restoreEngineForPosition(_uiState.value)
             engine.analyze(
                 maxVisits = visits,

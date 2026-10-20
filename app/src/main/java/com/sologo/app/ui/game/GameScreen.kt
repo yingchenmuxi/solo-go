@@ -77,6 +77,9 @@ fun GameScreen(
     LifecycleEventEffect(Lifecycle.Event.ON_START) {
         vm.onForeground()
     }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        vm.onBackground()
+    }
     LaunchedEffect(vm) {
         vm.events.collect { event ->
             when (event) {
