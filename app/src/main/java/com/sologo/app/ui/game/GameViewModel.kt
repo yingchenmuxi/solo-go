@@ -13,6 +13,7 @@ import com.sologo.core.model.GoPoint
 import com.sologo.core.model.HandicapOptions
 import com.sologo.core.model.HandicapStones
 import com.sologo.core.model.MoveRecord
+import com.sologo.core.model.PositionAnalysis
 import com.sologo.core.model.ScoreSummary
 import com.sologo.core.model.StoneColor
 import com.sologo.engine.BatteryTemperatureMonitor
@@ -377,21 +378,40 @@ class GameViewModel(
                 val visits = settings.settings.first().aiLevel.analysisVisits.coerceAtLeast(200)
                 var summary: ScoreSummary? = null
                 var markers: List<Float> = emptyList()
-                runCatching {
-                    engine.analyze(
+                var analysis: PositionAnalysis? = null
+                try {
+                    if (!engine.isRunning()) {
+                        restoreEngineForPosition(state)
+                    }
+                    analysis = engine.analyze(
                         maxVisits = visits,
                         intervalMs = 250,
                         durationMs = 1_000,
                         turn = state.turn
                     )
-                }.onSuccess { analysis ->
+                } catch (t: EngineConnectionLostException) {
+                    if (isForeground) {
+                        restoreEngineForPosition(state)
+                        analysis = runCatching {
+                            engine.analyze(
+                                maxVisits = visits,
+                                intervalMs = 250,
+                                durationMs = 1_000,
+                                turn = state.turn
+                            )
+                        }.getOrNull()
+                    }
+                } catch (_: Throwable) {
+                    // 地盘标记失败时仍保留 final_score 的结果。
+                }
+                analysis?.let { resultAnalysis ->
                     summary = ScoreSummary.fromOwnership(
-                        ownership = analysis.ownership,
+                        ownership = resultAnalysis.ownership,
                         scoringBoard = scoringBoard,
                         komi = state.komi
                     )
                     markers = ScoreSummary.emptyPointMarkers(
-                        ownership = analysis.ownership,
+                        ownership = resultAnalysis.ownership,
                         scoringBoard = scoringBoard
                     )
                 }
