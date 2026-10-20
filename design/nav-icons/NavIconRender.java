@@ -20,8 +20,10 @@ public final class NavIconRender {
         File dir = new File(args.length > 0 ? args[0] : ".");
         BufferedImage review = renderSvg(new File(dir, "nav-review.svg"));
         BufferedImage settings = renderSvg(new File(dir, "nav-settings.svg"));
+        BufferedImage play = renderSvg(new File(dir, "nav-play.svg"));
         ImageIO.write(review, "png", new File(dir, "nav-review.png"));
         ImageIO.write(settings, "png", new File(dir, "nav-settings.png"));
+        ImageIO.write(play, "png", new File(dir, "nav-play.png"));
         composeSheet(dir, review, settings);
     }
 

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="wood" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E9C88D"/>
+      <stop offset="0.48" stop-color="#D9AE6B"/>
+      <stop offset="1" stop-color="#BF8347"/>
+    </linearGradient>
+    <radialGradient id="whiteStoneWood" cx="32%" cy="26%" r="78%">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.62" stop-color="#F2F7F5"/>
+      <stop offset="1" stop-color="#C9D8D5"/>
+    </radialGradient>
+    <radialGradient id="darkStoneWood" cx="34%" cy="28%" r="76%">
+      <stop offset="0" stop-color="#61737A"/>
+      <stop offset="0.34" stop-color="#18262C"/>
+      <stop offset="1" stop-color="#020507"/>
+    </radialGradient>
+    <filter id="glowWood" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadowWood" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="20" stdDeviation="18" flood-color="#4A2B0F" flood-opacity="0.45"/>
+    </filter>
+    <clipPath id="tileWood">
+      <rect width="1024" height="1024" rx="230"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#tileWood)">
+    <rect width="1024" height="1024" fill="url(#wood)"/>
+    <g fill="none" stroke="#7A4A22" opacity="0.19">
+      <path d="M-120,164C132,102 280,218 510,152S820,104 1140,184" stroke-width="18"/>
+      <path d="M-120,292C144,230 296,342 512,288S842,228 1140,314" stroke-width="10"/>
+      <path d="M-120,438C122,380 310,474 518,422S842,372 1140,452" stroke-width="15"/>
+      <path d="M-120,610C150,548 300,646 522,588S844,528 1140,618" stroke-width="11"/>
+      <path d="M-120,778C132,706 308,806 526,746S848,692 1140,790" stroke-width="18"/>
+      <path d="M-120,902C160,850 300,936 530,884S850,836 1140,920" stroke-width="9"/>
+    </g>
+    <g fill="none" stroke="#875228" opacity="0.15">
+      <ellipse cx="842" cy="342" rx="78" ry="164" transform="rotate(-16 842 342)" stroke-width="12"/>
+      <ellipse cx="842" cy="342" rx="43" ry="96" transform="rotate(-16 842 342)" stroke-width="9"/>
+      <ellipse cx="182" cy="804" rx="112" ry="48" transform="rotate(-12 182 804)" stroke-width="11"/>
+    </g>
+    <g stroke="#31544F" stroke-width="7" opacity="0.22">
+      <path d="M212 212H812M212 362H812M212 512H812M212 662H812M212 812H812"/>
+      <path d="M212 212V812M362 212V812M512 212V812M662 212V812M812 212V812"/>
+    </g>
+    <path d="M340 340C508 278 500 724 684 684" fill="none" stroke="#168F82"
+          stroke-width="30" stroke-linecap="round" opacity="0.94" filter="url(#glowWood)"/>
+    <circle cx="340" cy="340" r="156" fill="url(#whiteStoneWood)" filter="url(#shadowWood)"/>
+    <ellipse cx="298" cy="294" rx="48" ry="28" fill="#FFFFFF" opacity="0.80" transform="rotate(-26 298 294)"/>
+    <circle cx="684" cy="684" r="156" fill="url(#darkStoneWood)" stroke="#168F82" stroke-width="12" filter="url(#shadowWood)"/>
+    <ellipse cx="640" cy="638" rx="42" ry="25" fill="#FFFFFF" opacity="0.20" transform="rotate(-28 640 638)"/>
+    <circle cx="684" cy="684" r="10" fill="#75FFF1"/>
+  </g>
+  <rect x="18" y="18" width="988" height="988" rx="216" fill="none" stroke="#7A4A22" stroke-width="10" opacity="0.24"/>
+</svg>
