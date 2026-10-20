@@ -1,6 +1,7 @@
 package com.sologo.app
 
 import android.os.Bundle
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -24,10 +25,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.sologo.app.data.AppSettings
 import com.sologo.app.ui.about.AboutScreen
 import com.sologo.app.ui.about.PrivacyPolicyScreen
@@ -35,6 +38,7 @@ import com.sologo.app.ui.components.PrivacyDialog
 import com.sologo.app.ui.game.GameScreen
 import com.sologo.app.ui.home.HomeScreen
 import com.sologo.app.ui.review.ReviewScreen
+import com.sologo.app.ui.review.ReviewDetailScreen
 import com.sologo.app.ui.settings.SettingsScreen
 import com.sologo.app.ui.theme.SoloGoAppTheme
 import kotlinx.coroutines.launch
@@ -139,6 +143,25 @@ private fun SoloGoApp(container: AppContainer) {
             composable("review") {
                 ReviewScreen(
                     container = container,
+                    onOpenReview = { file ->
+                        navController.navigate("review/detail?path=${Uri.encode(file.absolutePath)}")
+                    }
+                )
+            }
+            composable(
+                route = "review/detail?path={path}",
+                arguments = listOf(
+                    navArgument("path") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    }
+                )
+            ) { entry ->
+                ReviewDetailScreen(
+                    container = container,
+                    filePath = entry.arguments?.getString("path")
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let(Uri::decode),
                     onBack = { navController.popBackStack() }
                 )
             }

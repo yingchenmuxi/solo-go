@@ -117,12 +117,12 @@ SDK 至少需要 `platforms;android-37.0` 和 `build-tools;37.0.0`（AGP 也可�
 .\gradlew.bat :app:assembleDebug
 ```
 
-产物为 `app/build/outputs/apk/debug/app-debug.apk`（约 147MB，SHA256 `1B11592BCEB26823B261C3A2355C734F38461ADD97A76FC114754D960BB6E7D5`）。APK 内已确认包含 `lib/arm64-v8a/libkatago.so`、普通权重、HumanSL 权重、`gtp.cfg` 和 MD5 清单。由于当前没有连接 arm64 真机/模拟器，尚未验证实际设备上的进程执行和触摸体验；这一步需要在 Android 10+ arm64 真机上安装 APK 后完成。
+产物为 `app/build/outputs/apk/debug/app-debug.apk`（约 147MB，SHA256 `732D4A83CB10C29B9A989FDBEFFB52A9664FBAA13BB00436AFFA3864B9BA4D01`）。APK 内已确认包含 `lib/arm64-v8a/libkatago.so`、普通权重、HumanSL 权重、`gtp.cfg` 和 MD5 清单。由于当前没有连接 arm64 真机/模拟器，尚未验证实际设备上的进程执行和触摸体验；这一步需要在 Android 10+ arm64 真机上安装 APK 后完成。
 
 每次执行 `assembleDebug` 后还会自动生成一份带北京时间戳的副本，例如：
 
 ```
-app/build/outputs/apk/debug/sologo_20261020_204346.apk
+app/build/outputs/apk/debug/sologo_20261020_205533.apk
 ```
 
 原始 `app-debug.apk` 仍保留，Android Studio 的 Run/Install 流程不受影响。`assembleRelease` 也会在 release 目录生成同样的 `sologo_日期_时间.apk`。
