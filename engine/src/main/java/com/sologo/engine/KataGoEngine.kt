@@ -306,6 +306,8 @@ class KataGoEngine(
         var ownership = emptyList<Float>()
         var totalVisits = 0
         for (line in lines) {
+            // ownership 可能位于 rootInfo 顶层字段行，必须独立于候选着法解析。
+            parseFullOwnership(line, turn)?.let { ownership = it }
             line.split(" info ").forEachIndexed { index, segment ->
                 val normalized = if (segment.startsWith("info ")) segment else "info $segment"
                 val parsed = parseInfoLine(normalized, turn) ?: return@forEachIndexed
@@ -357,13 +359,8 @@ class KataGoEngine(
                     continue
                 }
                 "ownership" -> {
-                    val values = mutableListOf<Float>()
-                    i++
-                    while (i < tokens.size) {
-                        tokens[i].toFloatOrNull()?.let(values::add)
-                        i++
-                    }
-                    ownership = normalizeOwnershipToBlack(values, turn)
+                    ownership = parseFullOwnership(line, turn).orEmpty()
+                    i = tokens.size
                     continue
                 }
                 else -> Unit
@@ -381,6 +378,25 @@ class KataGoEngine(
             pv = pv,
             ownership = ownership
         )
+    }
+
+    private fun parseFullOwnership(line: String, turn: StoneColor): List<Float>? {
+        val tokens = line.trim().split(Regex("\\s+"))
+        val start = tokens.indexOf("ownership")
+        if (start < 0) return null
+        val expected = boardSize * boardSize
+        val values = ArrayList<Float>(expected)
+        var index = start + 1
+        while (index < tokens.size && values.size < expected) {
+            val value = tokens[index].toFloatOrNull() ?: break
+            values.add(value)
+            index++
+        }
+        return if (values.size == expected) {
+            normalizeOwnershipToBlack(values, turn)
+        } else {
+            null
+        }
     }
 
     private fun candidatesFallbackOrder(visits: Int): Int = 10_000 - visits.coerceAtMost(10_000)

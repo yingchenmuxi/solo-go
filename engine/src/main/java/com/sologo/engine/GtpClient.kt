@@ -146,7 +146,7 @@ class GtpClient(
                 throw GtpCommandException(command, first.removePrefix("?").trim())
             }
             val firstValue = first.removePrefix("=").trim()
-            if (firstValue.startsWith("info ")) output.add(firstValue)
+            if (firstValue.isNotBlank()) output.add(firstValue)
             val deadline = System.currentTimeMillis() + durationMs
             while (true) {
                 val remaining = deadline - System.currentTimeMillis()
@@ -155,7 +155,9 @@ class GtpClient(
                     lines.receiveCatching().getOrNull()
                 } ?: break
                 if (line.isBlank()) break
-                if (line.startsWith("info ")) output.add(line)
+                // kata-analyze 的 rootInfo/ownership 可能位于独立的顶层字段行，
+                // 不能只保留以 info 开头的候选着法行。
+                output.add(line)
             }
             output
         } finally {
