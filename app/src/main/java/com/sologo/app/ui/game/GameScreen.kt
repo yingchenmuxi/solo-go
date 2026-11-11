@@ -14,15 +14,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
-import androidx.compose.material3.Card
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,10 +35,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,6 +53,8 @@ import com.sologo.app.AppContainer
 import com.sologo.app.ui.components.GoBoard
 import com.sologo.app.ui.components.TerritoryBlackColor
 import com.sologo.app.ui.components.TerritoryWhiteColor
+import com.sologo.app.ui.components.ZenSurface
+import com.sologo.app.ui.components.zenPageBackground
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.delay
 
@@ -81,12 +90,18 @@ fun GameScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("人机对局") },
+                title = { Text("对局", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     TextButton(onClick = onBack) { Text("返回") }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.primary
+                )
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -95,72 +110,210 @@ fun GameScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .zenPageBackground()
                 .verticalScroll(rememberScrollState())
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             CompactGameHeader(state, vm::toggleAnalysis)
-            val boardOwnership = if (state.scoreVisible) {
-                state.scoreMarkers
-            } else {
-                state.analysisOwnership
+            ZenSurface(modifier = Modifier.fillMaxWidth()) {
+                GoBoard(
+                    position = state.board,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(7.dp)
+                        .clip(RoundedCornerShape(15.dp)),
+                    enabled = !state.busy && !state.gameOver && !state.highTemp &&
+                        state.turn == state.humanColor,
+                    ownership = state.analysisOwnership,
+                    showOwnership = state.analysisVisible && state.analysisOwnership.isNotEmpty(),
+                    ownershipThreshold = 0.08f,
+                    onIntersectionTap = vm::onBoardTap
+                )
             }
-            GoBoard(
-                position = state.board,
-                enabled = !state.busy && !state.gameOver && !state.highTemp &&
-                    state.turn == state.humanColor,
-                ownership = boardOwnership,
-                showOwnership = (state.scoreVisible && state.scoreMarkers.isNotEmpty()) ||
-                    (state.analysisVisible && state.analysisOwnership.isNotEmpty()),
-                ownershipThreshold = if (state.scoreVisible) 0.01f else 0.08f,
-                onIntersectionTap = vm::onBoardTap
+            GameActionBar(
+                state = state,
+                onUndo = vm::undo,
+                onPass = vm::pass,
+                onScore = vm::countScore,
+                onSave = vm::saveGame,
+                onResign = vm::resign,
+                onRestart = vm::restart
             )
-            if (state.scoreVisible) {
-                ScorePanel(state)
-            }
+            Spacer(Modifier.height(2.dp))
+        }
+    }
+
+    if (state.showEndGamePrompt) {
+        EndGamePrompt(
+            onCount = vm::confirmEndGameCount,
+            onDismiss = vm::dismissEndGamePrompt
+        )
+    }
+}
+
+@Composable
+private fun EndGamePrompt(
+    onCount: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("双方连续停一手") },
+        text = {
+            Text("对局已结束，是否使用当前形势判断进行数子？")
+        },
+        confirmButton = {
+            Button(onClick = onCount) { Text("数子") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("暂不数子") }
+        }
+    )
+}
+
+/**
+ * 对局工具栏采用“高频操作 + 次要操作”两行布局。
+ * 高频按钮使用紧凑色块，次要按钮使用低高度文字按钮，
+ * 在不隐藏功能的前提下显著减少纵向占用。
+ */
+@Composable
+private fun GameActionBar(
+    state: GameUiState,
+    onUndo: () -> Unit,
+    onPass: () -> Unit,
+    onScore: () -> Unit,
+    onSave: () -> Unit,
+    onResign: () -> Unit,
+    onRestart: () -> Unit
+) {
+    ZenSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                OutlinedButton(
-                    onClick = vm::undo,
+                CompactActionButton(
+                    text = "悔棋",
+                    onClick = onUndo,
                     enabled = !state.busy && state.moves.any { it.color == state.humanColor },
                     modifier = Modifier.weight(1f)
-                ) { Text("悔棋") }
-                OutlinedButton(
-                    onClick = vm::pass,
+                )
+                CompactActionButton(
+                    text = "停一手",
+                    onClick = onPass,
                     enabled = !state.busy && !state.gameOver && state.turn == state.humanColor,
                     modifier = Modifier.weight(1f)
-                ) { Text("停一手") }
+                )
+                CompactActionButton(
+                    text = "数子",
+                    onClick = onScore,
+                    // 即使 AI 正在思考也允许点击，ViewModel 会提示稍后再执行。
+                    enabled = state.started,
+                    emphasized = true,
+                    modifier = Modifier.weight(1f)
+                )
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                OutlinedButton(
-                    onClick = vm::saveGame,
+                CompactTextAction(
+                    text = "保存棋谱",
+                    onClick = onSave,
+                    enabled = state.moves.isNotEmpty(),
                     modifier = Modifier.weight(1f)
-                ) { Text("保存 SGF") }
-                OutlinedButton(
-                    onClick = vm::countScore,
-                    // 即使 KataGo 正在思考也允许点击，ViewModel 会给出“请稍后”的提示，
-                    // 避免按钮看起来完全失效。
-                    enabled = state.started,
-                    modifier = Modifier.weight(1f)
-                ) { Text("数子") }
-                TextButton(
-                    onClick = vm::resign,
+                )
+                CompactTextAction(
+                    text = "认输",
+                    onClick = onResign,
                     enabled = !state.gameOver,
                     modifier = Modifier.weight(1f)
-                ) { Text("认输") }
+                )
+                CompactTextAction(
+                    text = "重新开局",
+                    onClick = onRestart,
+                    enabled = !state.busy,
+                    modifier = Modifier.weight(1f)
+                )
             }
-            OutlinedButton(
-                onClick = vm::restart,
-                enabled = !state.busy,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("重新开局") }
-            Spacer(Modifier.height(8.dp))
         }
+    }
+}
+
+@Composable
+private fun CompactActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    emphasized: Boolean = false
+) {
+    val shape: Shape = RoundedCornerShape(9.dp)
+    val containerColor = when {
+        !enabled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        emphasized -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+    }
+    val contentColor = when {
+        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+        emphasized -> MaterialTheme.colorScheme.onPrimary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(30.dp),
+        shape = shape,
+        color = containerColor,
+        contentColor = contentColor
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactTextAction(
+    text: String,
+    onClick: () -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val contentColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+    }
+    Box(
+        modifier = modifier
+            .height(22.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .clickable(
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = contentColor,
+            maxLines = 1
+        )
     }
 }
 
@@ -189,10 +342,10 @@ private fun CompactGameHeader(
     state: GameUiState,
     onToggleAnalysis: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    ZenSurface(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -200,7 +353,7 @@ private fun CompactGameHeader(
             ) {
                 Text(
                     text = state.status,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -234,12 +387,25 @@ private fun CompactGameHeader(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                TextButton(
-                    onClick = onToggleAnalysis,
-                    enabled = state.analysisVisible || state.analysisRunning || !state.busy,
-                    contentPadding = PaddingValues(0.dp)
+                val analysisEnabled =
+                    state.analysisVisible || state.analysisRunning || !state.busy
+                Box(
+                    modifier = Modifier
+                        .height(28.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.09f),
+                            RoundedCornerShape(999.dp)
+                        )
+                        .clip(RoundedCornerShape(7.dp))
+                        .clickable(
+                            enabled = analysisEnabled,
+                            role = Role.Button,
+                            onClick = onToggleAnalysis
+                        )
+                        .padding(horizontal = 7.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = when {
@@ -247,7 +413,13 @@ private fun CompactGameHeader(
                             state.analysisVisible -> "关闭形势"
                             else -> "形势分析"
                         },
-                        style = MaterialTheme.typography.labelSmall
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (analysisEnabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                        },
+                        maxLines = 1
                     )
                 }
                 if (state.analysisVisible) {
@@ -258,6 +430,38 @@ private fun CompactGameHeader(
                             "${state.analysisVisits}v",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            if (state.analysisVisible) {
+                state.analysisSummary?.let { summary ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "估计占地：黑 ${summary.blackArea} 目 · " +
+                                "白 ${summary.whiteArea} 目" +
+                                if (summary.neutralPoints > 0) {
+                                    " · 未定 ${summary.neutralPoints} 点"
+                                } else {
+                                    ""
+                                },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = when {
+                                summary.isEven -> "双方持平"
+                                summary.lead > 0 ->
+                                    "黑领先 ${summary.lead.formatScore()} 目"
+                                else ->
+                                    "白领先 ${(-summary.lead).formatScore()} 目"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
@@ -283,72 +487,6 @@ private fun CompactGameHeader(
 }
 
 @Composable
-private fun ScorePanel(state: GameUiState) {
-    val summary = state.scoreSummary
-    val result = state.scoreResult
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text("数子结果", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-            if (summary != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TerritoryLegendItem(
-                        color = TerritoryBlackColor,
-                        text = "黑地 ${summary.blackTerritory} 目"
-                    )
-                    TerritoryLegendItem(
-                        color = TerritoryWhiteColor,
-                        text = "白地 ${summary.whiteTerritory} 目"
-                    )
-                }
-                Text(
-                    text = "总占地（含子与贴目）：黑 ${summary.blackScore.formatScore()} · " +
-                        "白 ${summary.whiteScore.formatScore()} 目",
-                    style = MaterialTheme.typography.labelSmall
-                )
-                Text(
-                    text = if (summary.isEven) {
-                        "按标记计算：双方持平"
-                    } else if (summary.lead > 0) {
-                        "按标记计算：黑胜 ${summary.lead.formatScore()} 目"
-                    } else {
-                        "按标记计算：白胜 ${(-summary.lead).formatScore()} 目"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                if (summary.neutralPoints > 0) {
-                    Text(
-                        "未定 ${summary.neutralPoints} 点，以 KataGo 结果为准",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                Text(
-                    "未能获取地盘标记，以 KataGo 数子结果为准",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            result?.let {
-                Text(
-                    "KataGo：${formatScoreResult(it)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun TerritoryLegendItem(color: Color, text: String) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -363,22 +501,7 @@ private fun TerritoryLegendItem(color: Color, text: String) {
     }
 }
 
-private fun Float.formatScore(): String = "%.1f".format(this)
-
 private fun Double.formatScore(): String = "%.1f".format(this)
-
-private fun formatScoreResult(result: String): String = when {
-    result.startsWith("B+") -> scoreWinnerText("黑", result.removePrefix("B+"))
-    result.startsWith("W+") -> scoreWinnerText("白", result.removePrefix("W+"))
-    else -> result
-}
-
-private fun scoreWinnerText(winner: String, value: String): String =
-    if (value.equals("Resign", ignoreCase = true)) {
-        "${winner}胜（对方认输）"
-    } else {
-        "${winner}胜 $value 目"
-    }
 
 private class GameViewModelFactory(
     private val container: AppContainer

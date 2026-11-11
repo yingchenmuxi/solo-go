@@ -9,6 +9,7 @@ import com.sologo.core.model.BoardPosition
 import com.sologo.core.model.CandidateMove
 import com.sologo.core.model.GameRecord
 import com.sologo.core.model.StoneColor
+import com.sologo.core.model.TerritorySummary
 import com.sologo.sgf.SgfCodec
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+enum class ReviewAnalysisMode {
+    POSITION,
+    AI
+}
+
 data class ReviewUiState(
     val file: File? = null,
     val selectedGame: SavedGame? = null,
@@ -31,12 +37,14 @@ data class ReviewUiState(
     val selectedIndex: Int = 0,
     val board: BoardPosition = BoardPosition.empty(19),
     val ownership: List<Float> = emptyList(),
+    val territorySummary: TerritorySummary? = null,
     val candidates: List<CandidateMove> = emptyList(),
     val analysisVisits: Int = 0,
     val advancedAccess: Boolean = false,
     val showPaywall: Boolean = false,
     val loading: Boolean = false,
     val analyzing: Boolean = false,
+    val analysisMode: ReviewAnalysisMode? = null,
     val highTemp: Boolean = false,
     val batteryTemp: Float? = null,
     val progress: Float = 0f,
@@ -111,9 +119,11 @@ class ReviewViewModel(
                 record = null,
                 positions = emptyList(),
                 ownership = emptyList(),
+                territorySummary = null,
                 candidates = emptyList(),
                 analysisVisits = 0,
                 analyzing = false,
+                analysisMode = null,
                 progress = 0f,
                 selectedIndex = 0,
                 board = BoardPosition.empty(19),
@@ -131,6 +141,7 @@ class ReviewViewModel(
                 it.copy(
                     loading = true,
                     analyzing = false,
+                    analysisMode = null,
                     progress = 0f,
                     error = null,
                     message = null
@@ -151,6 +162,7 @@ class ReviewViewModel(
                         selectedIndex = 0,
                         board = positions.firstOrNull() ?: BoardPosition.empty(record.size),
                         ownership = emptyList(),
+                        territorySummary = null,
                         candidates = emptyList(),
                         analysisVisits = 0,
                         loading = false
@@ -177,19 +189,41 @@ class ReviewViewModel(
                 selectedIndex = safe,
                 board = state.positions[safe],
                 ownership = emptyList(),
+                territorySummary = null,
                 candidates = emptyList(),
                 analysisVisits = 0,
                 analyzing = false,
+                analysisMode = null,
                 progress = 0f
             )
         }
     }
 
-    /**
-     * 只分析当前选中的局面，避免整盘逐手分析耗时。
-     * KataGo 至少加载到 selectedIndex 手，再用一次 kata-analyze 取前几个推荐点。
-     */
-    fun analyzeCurrent() {
+    /** 形势判断与对局页一致：使用当前局面的 ownership 计算领地和差距。 */
+    fun togglePositionAnalysis() {
+        val state = _state.value
+        if (state.analyzing) return
+        if (state.ownership.isNotEmpty()) {
+            _state.update {
+                it.copy(
+                    ownership = emptyList(),
+                    territorySummary = null,
+                    analysisMode = null,
+                    progress = 0f,
+                    message = "形势判断已关闭"
+                )
+            }
+            return
+        }
+        runAnalysis(ReviewAnalysisMode.POSITION)
+    }
+
+    /** AI 分析当前局面，给出若干下一手候选位置。 */
+    fun analyzeAi() {
+        runAnalysis(ReviewAnalysisMode.AI)
+    }
+
+    private fun runAnalysis(mode: ReviewAnalysisMode) {
         val state = _state.value
         if (state.file == null || state.record == null) return
         if (!state.advancedAccess) {
@@ -210,16 +244,31 @@ class ReviewViewModel(
             _state.update {
                 it.copy(
                     analyzing = true,
+                    analysisMode = mode,
                     progress = 0f,
                     error = null,
-                    message = "正在分析当前局面…",
-                    ownership = emptyList(),
-                    candidates = emptyList(),
-                    analysisVisits = 0
+                    message = when (mode) {
+                        ReviewAnalysisMode.POSITION -> "正在判断形势…"
+                        ReviewAnalysisMode.AI -> "AI 正在分析下一手…"
+                    },
+                    ownership = if (mode == ReviewAnalysisMode.POSITION) {
+                        emptyList()
+                    } else {
+                        it.ownership
+                    },
+                    territorySummary = if (mode == ReviewAnalysisMode.POSITION) {
+                        null
+                    } else {
+                        it.territorySummary
+                    },
+                    candidates = if (mode == ReviewAnalysisMode.AI) {
+                        emptyList()
+                    } else {
+                        it.candidates
+                    }
                 )
             }
             try {
-                // 当前局面分析保持轻量：限制 visits，单次分析受 maxTime 约束。
                 val visits = settings.settings.first().aiLevel.analysisVisits.coerceIn(60, 160)
                 container.engine.initialize()
                 val loadedSgf = runCatching {
@@ -241,30 +290,68 @@ class ReviewViewModel(
                 } else {
                     record.moves.lastOrNull()?.color?.opponent ?: StoneColor.BLACK
                 }
-                val analysis = container.engine.analyze(
-                    maxVisits = visits,
-                    intervalMs = 250,
-                    durationMs = 900,
-                    turn = turn,
-                    includeOwnership = false
-                )
                 if (_state.value.selectedIndex != selectedIndex) return@launch
-                _state.update {
-                    it.copy(
-                        analyzing = false,
-                        progress = 1f,
-                        candidates = analysis.candidates.take(5),
-                        ownership = analysis.ownership,
-                        analysisVisits = analysis.visits,
-                        message = "当前局面分析完成（${analysis.visits} visits）"
-                    )
+
+                when (mode) {
+                    ReviewAnalysisMode.POSITION -> {
+                        val analysis = container.engine.analyze(
+                            maxVisits = visits,
+                            turn = turn,
+                            includeOwnership = true
+                        )
+                        val expected = record.size * record.size
+                        if (analysis.ownership.size < expected) {
+                            throw IllegalStateException(
+                                "KataGo 未返回完整领地数据：${analysis.ownership.size}/$expected"
+                            )
+                        }
+                        val summary = TerritorySummary.fromOwnership(
+                            ownership = analysis.ownership,
+                            boardSize = record.size,
+                            komi = record.komi
+                        ) ?: throw IllegalStateException("无法计算当前形势")
+                        _state.update {
+                            it.copy(
+                                analyzing = false,
+                                analysisMode = null,
+                                progress = 1f,
+                                ownership = analysis.ownership,
+                                territorySummary = summary,
+                                analysisVisits = analysis.visits,
+                                message = summary.leadText()
+                            )
+                        }
+                    }
+
+                    ReviewAnalysisMode.AI -> {
+                        val analysis = container.engine.analyzePolicy(turn)
+                        val candidates = analysis.candidates.take(5)
+                        _state.update {
+                            it.copy(
+                                analyzing = false,
+                                analysisMode = null,
+                                progress = 1f,
+                                candidates = candidates,
+                                analysisVisits = analysis.visits,
+                                message = if (candidates.isEmpty()) {
+                                    "AI 分析完成，暂未找到推荐点"
+                                } else {
+                                    "AI 分析完成，推荐 ${candidates.size} 个下一手"
+                                }
+                            )
+                        }
+                    }
                 }
             } catch (t: Throwable) {
                 if (_state.value.selectedIndex != selectedIndex) return@launch
                 _state.update {
                     it.copy(
                         analyzing = false,
-                        error = "当前局面分析失败: ${t.message}",
+                        analysisMode = null,
+                        error = when (mode) {
+                            ReviewAnalysisMode.POSITION -> "形势判断失败: ${t.message}"
+                            ReviewAnalysisMode.AI -> "AI 分析失败: ${t.message}"
+                        },
                         message = null
                     )
                 }
@@ -307,4 +394,15 @@ class ReviewViewModel(
         return result
     }
 
+}
+
+private fun TerritorySummary.leadText(): String {
+    val leader = if (lead >= 0) "黑" else "白"
+    return "形势：黑 $blackArea 目 · " +
+        "白 $whiteArea 目 · " +
+        if (isEven) {
+            "双方持平"
+        } else {
+            "${leader}领先 ${"%.1f".format(kotlin.math.abs(lead))} 目"
+        }
 }

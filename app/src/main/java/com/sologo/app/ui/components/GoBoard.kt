@@ -73,6 +73,16 @@ fun GoBoard(
                 colors = listOf(Color(0xFFE8C98E), Color(0xFFD8AE6B))
             )
         )
+        // 极淡的木纹线，避免大块纯色让棋盘显得像塑料。
+        repeat(11) { index ->
+            val y = size.height * (index + 0.8f) / 12f
+            drawLine(
+                color = Color(0xFF805A32).copy(alpha = if (index % 3 == 0) 0.055f else 0.028f),
+                start = Offset(0f, y),
+                end = Offset(size.width, y + size.height * 0.006f),
+                strokeWidth = if (index % 3 == 0) 1.2f else 0.7f
+            )
+        }
 
         // 势力层放在格线下面、棋子上面。蓝色表示黑方影响，红色表示白方影响，
         // 颜色深浅跟随 ownership 的置信度，便于同时看清边界和确定区域。
@@ -158,9 +168,9 @@ fun GoBoard(
             if (p.x !in 0 until boardSize || p.y !in 0 until boardSize) return@forEachIndexed
             val center = point(p.x, p.y)
             val markerColor = when (index) {
-                0 -> Color(0xFF1E88E5)
-                1 -> Color(0xFF43A047)
-                else -> Color(0xFFFB8C00)
+                0 -> Color(0xFF8F3D2D)
+                1 -> Color(0xFF5E7055)
+                else -> Color(0xFFB27A42)
             }
             drawCircle(
                 color = markerColor.copy(alpha = 0.9f),
@@ -247,5 +257,5 @@ private fun starPoints(boardSize: Int): List<Pair<Int, Int>> {
 private const val BOARD_MARGIN_RATIO = 0.09f
 
 /** 与局势面板图例共用，避免棋盘颜色和说明颜色不一致。 */
-val TerritoryBlackColor = Color(0xFF1565C0)
-val TerritoryWhiteColor = Color(0xFFE53935)
+val TerritoryBlackColor = Color(0xFF355B4A)
+val TerritoryWhiteColor = Color(0xFFA74A35)

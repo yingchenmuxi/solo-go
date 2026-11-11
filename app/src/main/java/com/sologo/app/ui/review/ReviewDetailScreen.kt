@@ -3,7 +3,9 @@ package com.sologo.app.ui.review
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,14 +18,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
@@ -31,6 +32,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,6 +40,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,6 +56,10 @@ import com.sologo.app.AppContainer
 import com.sologo.app.R
 import com.sologo.app.ui.components.GoBoard
 import com.sologo.app.ui.components.PaywallDialog
+import com.sologo.app.ui.components.TerritoryBlackColor
+import com.sologo.app.ui.components.TerritoryWhiteColor
+import com.sologo.app.ui.components.ZenSurface
+import com.sologo.app.ui.components.zenPageBackground
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.io.File
@@ -92,12 +100,18 @@ fun ReviewDetailScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("复盘分析") },
+                title = { Text("复盘分析", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     TextButton(onClick = onBack) { Text("返回") }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.primary
+                )
             )
         },
         snackbarHost = { SnackbarHost(snackbar) }
@@ -132,11 +146,12 @@ fun ReviewDetailScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .zenPageBackground()
                     .verticalScroll(rememberScrollState())
-                    .padding(12.dp),
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                ZenSurface(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -173,25 +188,27 @@ fun ReviewDetailScreen(
                         }
                     }
                 }
-                GoBoard(
-                    position = state.board,
-                    enabled = false,
-                    ownership = state.ownership,
-                    showOwnership = state.advancedAccess && state.ownership.isNotEmpty(),
-                    candidates = if (state.advancedAccess) state.candidates else emptyList()
-                )
+                ZenSurface(modifier = Modifier.fillMaxWidth()) {
+                    GoBoard(
+                        position = state.board,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(7.dp)
+                            .clip(RoundedCornerShape(15.dp)),
+                        enabled = false,
+                        ownership = state.ownership,
+                        showOwnership = state.advancedAccess && state.ownership.isNotEmpty(),
+                        candidates = if (state.advancedAccess) state.candidates else emptyList()
+                    )
+                }
                 Slider(
                     value = state.selectedIndex.toFloat(),
                     onValueChange = { vm.selectIndex(it.roundToInt()) },
                     valueRange = 0f..state.moveCount.coerceAtLeast(1).toFloat(),
                     steps = (state.moveCount - 1).coerceAtLeast(0)
                 )
-                Card(
+                ZenSurface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(50),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                    )
                 ) {
                     Row(
                         modifier = Modifier
@@ -228,29 +245,64 @@ fun ReviewDetailScreen(
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Button(
-                        onClick = vm::analyzeCurrent,
-                        enabled = !state.analyzing && state.advancedAccess && !state.highTemp,
-                        modifier = Modifier.height(36.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                    OutlinedButton(
+                        onClick = vm::togglePositionAnalysis,
+                        enabled = !state.analyzing && !state.highTemp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                     ) {
-                        Text(if (state.advancedAccess) "分析当前手" else "解锁当前手分析")
+                        Text(
+                            when {
+                                state.analysisMode == ReviewAnalysisMode.POSITION -> "判断中…"
+                                state.ownership.isNotEmpty() -> "关闭形势"
+                                state.advancedAccess -> "形势判断"
+                                else -> "解锁形势判断"
+                            },
+                            maxLines = 1
+                        )
                     }
-                    Text(
-                        text = when {
-                            state.analyzing -> "分析中…"
-                            state.highTemp -> "温度过高，已暂停"
-                            state.candidates.isNotEmpty() -> "推荐 ${state.candidates.size} 个点"
-                            else -> "尚未分析当前手"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Button(
+                        onClick = vm::analyzeAi,
+                        enabled = !state.analyzing && !state.highTemp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
+                        Text(
+                            when {
+                                state.analysisMode == ReviewAnalysisMode.AI -> "分析中…"
+                                state.advancedAccess -> "AI 分析"
+                                else -> "解锁 AI 分析"
+                            },
+                            maxLines = 1
+                        )
+                    }
+                }
+                Text(
+                    text = when {
+                        state.analyzing && state.analysisMode == ReviewAnalysisMode.POSITION ->
+                            "正在使用当前局面判断黑白势力…"
+                        state.analyzing && state.analysisMode == ReviewAnalysisMode.AI ->
+                            "AI 正在计算下一手候选位置…"
+                        state.highTemp -> "温度过高，已暂停分析"
+                        state.candidates.isNotEmpty() ->
+                            "AI 推荐 ${state.candidates.size} 个下一手候选位置"
+                        state.ownership.isNotEmpty() -> "形势判断已显示"
+                        else -> "可分别进行形势判断或 AI 下一手分析"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (state.advancedAccess && state.territorySummary != null) {
+                    TerritorySummaryPanel(state)
                 }
                 if (state.analyzing) {
                     LinearProgressIndicator(
@@ -282,6 +334,62 @@ fun ReviewDetailScreen(
 }
 
 @Composable
+private fun TerritorySummaryPanel(state: ReviewUiState) {
+    val summary = state.territorySummary ?: return
+    ZenSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TerritoryLegend(TerritoryBlackColor, "黑势力")
+                TerritoryLegend(TerritoryWhiteColor, "白势力")
+            }
+            Text(
+                text = "估计占地：黑 ${summary.blackArea} 目 · " +
+                    "白 ${summary.whiteArea} 目" +
+                    if (summary.neutralPoints > 0) {
+                        " · 未定 ${summary.neutralPoints} 点"
+                    } else {
+                        ""
+                    },
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = when {
+                    summary.isEven -> "贴目后双方持平"
+                    summary.lead > 0 ->
+                        "贴目后黑领先 ${"%.1f".format(summary.lead)} 目"
+                    else ->
+                        "贴目后白领先 ${"%.1f".format(kotlin.math.abs(summary.lead))} 目"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun TerritoryLegend(color: Color, text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(color.copy(alpha = 0.78f))
+        )
+        Text(text, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
 private fun MoveControl(
     iconRes: Int,
     description: String,
@@ -308,25 +416,25 @@ private fun MoveControl(
 
 @Composable
 private fun CandidateList(state: ReviewUiState) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    ZenSurface(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Text("当前局面推荐点", style = MaterialTheme.typography.titleSmall)
+            Text("AI 推荐的下一手", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "按 AI 首手倾向排序，棋盘上的数字对应下列位置。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             state.candidates.take(5).forEachIndexed { index, candidate ->
                 val columns = "ABCDEFGHJKLMNOPQRST"
                 val boardSize = state.record?.size ?: 19
                 val coordinate = candidate.move?.let {
                     "${columns[it.x]}${boardSize - it.y}"
                 } ?: "pass"
-                val pv = candidate.pv.take(4).joinToString(" ") { point ->
-                    "${columns[point.x]}${boardSize - point.y}"
-                }
                 Text(
-                    "${index + 1}. $coordinate · 黑胜率 ${(candidate.winrate * 100).toInt()}% · " +
-                        "目数 ${"%.1f".format(candidate.scoreLead)}" +
-                        (if (pv.isBlank()) "" else "\nPV: $pv"),
+                    "${index + 1}. $coordinate",
                     style = MaterialTheme.typography.bodySmall
                 )
             }

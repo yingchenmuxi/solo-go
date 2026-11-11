@@ -18,8 +18,8 @@ class TerritorySummaryTest {
             )
         )
 
-        assertEquals(81.0, summary.blackArea, 0.0001)
-        assertEquals(0.0, summary.whiteArea, 0.0001)
+        assertEquals(81, summary.blackArea)
+        assertEquals(0, summary.whiteArea)
         assertEquals(73.5, summary.lead, 0.0001)
     }
 
@@ -34,9 +34,34 @@ class TerritorySummaryTest {
             )
         )
 
-        assertEquals(40.0, summary.blackArea, 0.0001)
-        assertEquals(41.0, summary.whiteArea, 0.0001)
+        assertEquals(40, summary.blackArea)
+        assertEquals(41, summary.whiteArea)
         assertEquals(-8.5, summary.lead, 0.0001)
+    }
+
+    @Test
+    fun confidentOwnershipStillCountsAsIntegerPoints() {
+        val ownership = List(9 * 9) { index ->
+            when (index) {
+                0 -> 0.99f
+                1 -> 0.51f
+                2 -> -0.98f
+                3 -> -0.52f
+                4 -> 0.01f
+                else -> 0f
+            }
+        }
+        val summary = requireNotNull(
+            TerritorySummary.fromOwnership(
+                ownership = ownership,
+                boardSize = 9,
+                komi = 7.5f
+            )
+        )
+
+        assertEquals(2, summary.blackArea)
+        assertEquals(2, summary.whiteArea)
+        assertEquals(77, summary.neutralPoints)
     }
 
     @Test

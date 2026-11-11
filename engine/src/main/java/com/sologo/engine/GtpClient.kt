@@ -123,6 +123,60 @@ class GtpClient(
     }
 
     /**
+     * 读取 kata-raw-nn 的有限长度输出。
+     *
+     * policy 和 whiteOwnership 都可能跨多行，部分版本还会在字段之间插入空行。
+     * 普通 command() 遇到第一个空行就会结束，因此这里按数组实际数量判断完成，
+     * 避免把半截 policy 交给解析器。
+     */
+    suspend fun rawNeuralNet(
+        expectedPoints: Int,
+        requireOwnership: Boolean,
+        timeoutMs: Long = 30_000
+    ): String = commandMutex.withLock {
+        if (process?.isAlive != true) throw EngineNotReadyException()
+        drainBufferedLines()
+        val command = "kata-raw-nn 0"
+        val output = mutableListOf<String>()
+        try {
+            write(command)
+            val first = receiveAck(command, 15_000)
+            if (first.startsWith("?")) {
+                throw GtpCommandException(command, first.removePrefix("?").trim())
+            }
+            first.removePrefix("=").trim()
+                .takeIf { it.isNotBlank() }
+                ?.let(output::add)
+
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (!rawOutputComplete(output, expectedPoints, requireOwnership)) {
+                val remaining = deadline - System.currentTimeMillis()
+                if (remaining <= 0) break
+                val line = withTimeoutOrNull(remaining) {
+                    lines.receiveCatching().getOrNull()
+                } ?: break
+                // 空行可能位于字段之间，不能据此判定响应结束。
+                if (line.isBlank()) continue
+                output.add(line)
+            }
+            if (!rawOutputComplete(output, expectedPoints, requireOwnership)) {
+                val message =
+                    "kata-raw-nn 输出不完整，" +
+                        "ownership=${arrayTokenCount(output, "whiteOwnership")}/$expectedPoints，" +
+                        "policy=${arrayTokenCount(output, "policy")}/$expectedPoints"
+                logger(message)
+                throw KataGoException(message)
+            }
+            output.joinToString("\n")
+        } catch (t: CancellationException) {
+            throw t
+        } catch (t: Throwable) {
+            throw if (t is KataGoException) t
+            else KataGoException("读取 kata-raw-nn 失败", t)
+        }
+    }
+
+    /**
      * 执行 kata-analyze。KataGo 的分析输出是流式的，不会自己结束，
      * 因此这里读固定时长后发送 stop，并排空剩余输出。
      *
@@ -136,8 +190,9 @@ class GtpClient(
         if (process?.isAlive != true) throw EngineNotReadyException()
         drainBufferedLines()
         // maxmoves 限制单次输出候选数，避免完整 361 点分析把 stdout 撑爆。
+        val rootInfo = if (ownership) " rootInfo true" else ""
         val command = "kata-analyze interval ${(intervalMs / 10).coerceAtLeast(1)} " +
-            "ownership $ownership maxmoves $MAX_ANALYSIS_MOVES"
+            "ownership $ownership$rootInfo maxmoves $MAX_ANALYSIS_MOVES"
         val output = mutableListOf<String>()
         try {
             write(command)
@@ -147,18 +202,30 @@ class GtpClient(
             }
             val firstValue = first.removePrefix("=").trim()
             if (firstValue.isNotBlank()) output.add(firstValue)
-            val deadline = System.currentTimeMillis() + durationMs
-            while (true) {
-                val remaining = deadline - System.currentTimeMillis()
-                if (remaining <= 0) break
-                val line = withTimeoutOrNull(remaining) {
-                    lines.receiveCatching().getOrNull()
-                } ?: break
-                // kata-analyze 可能在字段之间输出空行，不能把它当成流结束。
-                if (line.isBlank()) continue
-                // kata-analyze 的 rootInfo/ownership 可能位于独立的顶层字段行，
-                // 不能只保留以 info 开头的候选着法行。
-                output.add(line)
+            val ownershipAlreadyReceived =
+                ownership && containsOwnershipField(firstValue)
+            if (ownershipAlreadyReceived) {
+                logger("kata-analyze 已收到 ownership 字段")
+            } else {
+                val deadline = System.currentTimeMillis() + durationMs
+                while (true) {
+                    val remaining = deadline - System.currentTimeMillis()
+                    if (remaining <= 0) break
+                    val line = withTimeoutOrNull(remaining) {
+                        lines.receiveCatching().getOrNull()
+                    } ?: break
+                    // kata-analyze 可能在字段之间输出空行，不能把它当成流结束。
+                    if (line.isBlank()) continue
+                    // ownership 可能位于独立的 rootInfo 顶层字段行。
+                    output.add(line)
+                    if (ownership && containsOwnershipField(line)) {
+                        logger("kata-analyze 已收到 ownership 字段")
+                        break
+                    }
+                }
+            }
+            if (ownership && output.none(::containsOwnershipField)) {
+                logger("kata-analyze 未收到 ownership，共 ${output.size} 行")
             }
             output
         } finally {
@@ -270,6 +337,47 @@ class GtpClient(
             // 丢弃旧数据；调用点都在 commandMutex 内，不会误丢当前命令的应答。
         }
     }
+
+    private fun containsOwnershipField(line: String): Boolean =
+        line.split(Regex("\\s+")).any { it == "ownership" }
+
+    private fun rawOutputComplete(
+        lines: List<String>,
+        expectedPoints: Int,
+        requireOwnership: Boolean
+    ): Boolean {
+        val ownershipComplete =
+            arrayTokenCount(lines, "whiteOwnership") >= expectedPoints
+        if (requireOwnership) {
+            return ownershipComplete
+        }
+        val tokens = lines.joinToString(" ").trim().split(Regex("\\s+"))
+        val policyComplete = tokens.contains("policyPass") &&
+            arrayTokenCount(lines, "policy") >= expectedPoints
+        // 同时读完 ownership，确保下一次命令不会读到上一条 raw-nn 的残留尾包。
+        return policyComplete && ownershipComplete
+    }
+
+    private fun arrayTokenCount(lines: List<String>, field: String): Int {
+        val tokens = lines.joinToString(" ").trim().split(Regex("\\s+"))
+        val start = tokens.indexOf(field)
+        if (start < 0) return 0
+        var count = 0
+        var index = start + 1
+        while (index < tokens.size) {
+            if (parseFloatToken(tokens[index]) == null) break
+            count++
+            index++
+        }
+        return count
+    }
+
+    private fun parseFloatToken(token: String): Float? =
+        if (token.equals("NAN", ignoreCase = true)) {
+            Float.NaN
+        } else {
+            token.toFloatOrNull()
+        }
 
     private suspend fun receiveLine(
         command: String,

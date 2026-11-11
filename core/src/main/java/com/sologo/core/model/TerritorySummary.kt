@@ -9,13 +9,13 @@ package com.sologo.core.model
  * - 负数表示预计归白方；
  * - 绝对值越大，归属越确定。
  *
- * 这里按置信度加权求和，而不是简单按正负计数，边界上的模糊点会按比例
- * 计入双方，避免 0.01 和 0.99 被当成同样的一目。当前应用使用中国规则，
- * 因此黑白面积包含棋子和预计领地。
+ * 目数按整点统计：置信度达到阈值的交叉点整点计入一方，其余点视为未定。
+ * 阈值与棋盘势力色块使用同一个值，避免“数字有小数、色块却是整点”的歧义。
  */
 data class TerritorySummary(
-    val blackArea: Double,
-    val whiteArea: Double,
+    val blackArea: Int,
+    val whiteArea: Int,
+    val neutralPoints: Int,
     val komi: Float,
     val lead: Double
 ) {
@@ -31,29 +31,33 @@ data class TerritorySummary(
         fun fromOwnership(
             ownership: List<Float>,
             boardSize: Int,
-            komi: Float
+            komi: Float,
+            threshold: Float = DEFAULT_THRESHOLD
         ): TerritorySummary? {
             val expectedSize = boardSize * boardSize
             if (boardSize !in 2..19 || ownership.size < expectedSize) return null
 
-            var black = 0.0
-            var white = 0.0
+            var black = 0
+            var white = 0
+            var neutral = 0
             for (index in 0 until expectedSize) {
                 val value = ownership[index]
-                if (!value.isFinite()) continue
-                val clamped = value.coerceIn(-1f, 1f)
-                if (clamped > 0f) {
-                    black += clamped
-                } else if (clamped < 0f) {
-                    white -= clamped
+                when {
+                    !value.isFinite() -> neutral++
+                    value >= threshold -> black++
+                    value <= -threshold -> white++
+                    else -> neutral++
                 }
             }
             return TerritorySummary(
                 blackArea = black,
                 whiteArea = white,
+                neutralPoints = neutral,
                 komi = komi,
-                lead = black - white - komi
+                lead = black.toDouble() - white.toDouble() - komi
             )
         }
+
+        const val DEFAULT_THRESHOLD = 0.08f
     }
 }

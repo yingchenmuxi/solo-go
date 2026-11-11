@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -20,12 +19,14 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -34,6 +35,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sologo.app.AppContainer
 import com.sologo.app.data.SavedGame
+import com.sologo.app.ui.components.ZenSurface
+import com.sologo.app.ui.components.zenPageBackground
 import kotlinx.coroutines.flow.collect
 import java.io.File
 import java.text.SimpleDateFormat
@@ -64,7 +67,16 @@ fun ReviewScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("复盘") }) },
+        containerColor = Color.Transparent,
+        topBar = {
+            TopAppBar(
+                title = { Text("复盘", style = MaterialTheme.typography.titleLarge) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
+            )
+        },
         snackbarHost = { SnackbarHost(snackbar) }
     ) { padding ->
         if (state.loading) {
@@ -97,7 +109,7 @@ private fun SavedGamePicker(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.padding(12.dp),
+        modifier = modifier.zenPageBackground().padding(horizontal = 14.dp, vertical = 9.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(
@@ -107,7 +119,7 @@ private fun SavedGamePicker(
             Column(modifier = Modifier.weight(1f)) {
                 Text("已存储对局", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "选择一盘棋进入独立复盘页面，支持逐手浏览和当前手 AI 分析。",
+                    "选择一盘棋进入独立复盘页面，支持逐手浏览、形势判断和下一手 AI 分析。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -116,7 +128,7 @@ private fun SavedGamePicker(
         }
 
         if (games.isEmpty()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
+            ZenSurface(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -136,7 +148,7 @@ private fun SavedGamePicker(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(games, key = { it.file.absolutePath }) { game ->
-                    Card(
+                    ZenSurface(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onSelect(game) }

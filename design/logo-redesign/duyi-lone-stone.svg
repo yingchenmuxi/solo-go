@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="ink" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0D2630"/>
+      <stop offset="0.48" stop-color="#081A24"/>
+      <stop offset="1" stop-color="#040B12"/>
+    </linearGradient>
+    <radialGradient id="stone" cx="34%" cy="27%" r="78%">
+      <stop offset="0" stop-color="#60717A"/>
+      <stop offset="0.34" stop-color="#1A2630"/>
+      <stop offset="1" stop-color="#010407"/>
+    </radialGradient>
+    <radialGradient id="aura" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#41D8C8" stop-opacity="0.20"/>
+      <stop offset="0.62" stop-color="#2A7EA0" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#06111D" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="tile">
+      <rect width="1024" height="1024" rx="230"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="1024" height="1024" fill="url(#ink)"/>
+    <circle cx="512" cy="512" r="500" fill="url(#aura)"/>
+    <g stroke="#8DFFF1" stroke-width="5" opacity="0.14">
+      <path d="M296 296H728M296 404H728M296 512H728M296 620H728M296 728H728"/>
+      <path d="M296 296V728M404 296V728M512 296V728M620 296V728M728 296V728"/>
+    </g>
+    <path d="M375 218C250 285 190 396 190 512C190 690 334 834 512 834C690 834 834 690 834 512C834 390 767 275 650 213"
+          fill="none" stroke="#F3E6CD" stroke-width="46" stroke-linecap="round"/>
+    <path d="M400 252C300 310 244 406 244 512C244 660 364 780 512 780C660 780 780 660 780 512C780 414 728 323 638 260"
+          fill="none" stroke="#5DE0D0" stroke-width="9" stroke-linecap="round" opacity="0.66"/>
+    <circle cx="650" cy="213" r="12" fill="#7DFFF1"/>
+    <circle cx="512" cy="512" r="174" fill="url(#stone)" stroke="#F5E8D0" stroke-width="9"/>
+    <ellipse cx="456" cy="453" rx="58" ry="34" fill="#FFFFFF" opacity="0.22" transform="rotate(-27 456 453)"/>
+    <circle cx="626" cy="642" r="14" fill="#7DFFF1" opacity="0.86"/>
+    <g fill="#F3E6CD" opacity="0.78">
+      <circle cx="296" cy="296" r="7"/>
+      <circle cx="728" cy="296" r="7"/>
+      <circle cx="296" cy="728" r="7"/>
+      <circle cx="728" cy="728" r="7"/>
+    </g>
+  </g>
+  <rect x="18" y="18" width="988" height="988" rx="216" fill="none" stroke="#8DFFF1" stroke-width="9" opacity="0.18"/>
+</svg>

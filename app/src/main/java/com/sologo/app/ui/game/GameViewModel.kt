@@ -9,14 +9,13 @@ import com.sologo.app.data.SgfRepository
 import com.sologo.core.model.BoardPosition
 import com.sologo.core.model.GameRecord
 import com.sologo.core.model.GameRules
-import com.sologo.core.model.GoCoordinates
 import com.sologo.core.model.GoPoint
 import com.sologo.core.model.HandicapOptions
 import com.sologo.core.model.HandicapStones
 import com.sologo.core.model.MoveRecord
 import com.sologo.core.model.PositionAnalysis
-import com.sologo.core.model.ScoreSummary
 import com.sologo.core.model.StoneColor
+import com.sologo.core.model.TerritorySummary
 import com.sologo.engine.BatteryTemperatureMonitor
 import com.sologo.engine.EngineConnectionLostException
 import com.sologo.engine.EngineState
@@ -53,14 +52,13 @@ data class GameUiState(
     val lastAiSeconds: Int? = null,
     val started: Boolean = false,
     val gameOver: Boolean = false,
-    val scoreVisible: Boolean = false,
-    val scoreMarkers: List<Float> = emptyList(),
-    val scoreSummary: ScoreSummary? = null,
     val scoreResult: String? = null,
     val analysisVisible: Boolean = false,
     val analysisRunning: Boolean = false,
     val analysisOwnership: List<Float> = emptyList(),
+    val analysisSummary: TerritorySummary? = null,
     val analysisVisits: Int = 0,
+    val showEndGamePrompt: Boolean = false,
     val batteryTemp: Float? = null,
     val highTemp: Boolean = false,
     val error: String? = null
@@ -173,14 +171,13 @@ class GameViewModel(
                     started = true,
                     gameOver = false,
                     lastAiSeconds = null,
-                    scoreVisible = false,
-                    scoreMarkers = emptyList(),
-                    scoreSummary = null,
                     scoreResult = null,
                     analysisVisible = false,
                     analysisRunning = false,
                     analysisOwnership = emptyList(),
-                    analysisVisits = 0
+                    analysisSummary = null,
+                    analysisVisits = 0,
+                    showEndGamePrompt = false
                 )
             }
             positionHistory.clear()
@@ -258,7 +255,9 @@ class GameViewModel(
             try {
                 engine.play(state.humanColor, null)
                 applyMove(state.humanColor, null)
-                maybeAiMove()
+                if (!_uiState.value.showEndGamePrompt) {
+                    maybeAiMove()
+                }
             } catch (t: Throwable) {
                 _uiState.update { it.copy(busy = false, error = t.message) }
             }
@@ -299,14 +298,13 @@ class GameViewModel(
                         gameOver = false,
                         lastAiSeconds = null,
                         status = "已悔棋，请重新落子",
-                        scoreVisible = false,
-                        scoreMarkers = emptyList(),
-                        scoreSummary = null,
                         scoreResult = null,
                         analysisVisible = false,
                         analysisRunning = false,
                         analysisOwnership = emptyList(),
-                        analysisVisits = 0
+                        analysisSummary = null,
+                        analysisVisits = 0,
+                        showEndGamePrompt = false
                     )
                 }
             } catch (t: Throwable) {
@@ -387,7 +385,7 @@ class GameViewModel(
      */
     fun toggleAnalysis() {
         val state = _uiState.value
-        if (!state.started || state.gameOver) return
+        if (!state.started) return
         if (state.analysisVisible || state.analysisRunning) {
             analysisJob?.cancel()
             _uiState.update {
@@ -396,6 +394,7 @@ class GameViewModel(
                     analysisVisible = false,
                     analysisRunning = false,
                     analysisOwnership = emptyList(),
+                    analysisSummary = null,
                     analysisVisits = 0,
                     status = "形势分析已关闭"
                 )
@@ -419,6 +418,7 @@ class GameViewModel(
                     analysisRunning = true,
                     analysisVisible = false,
                     analysisOwnership = emptyList(),
+                    analysisSummary = null,
                     analysisVisits = 0,
                     error = null,
                     status = "正在分析形势…"
@@ -436,14 +436,20 @@ class GameViewModel(
                         "KataGo 未返回完整领地数据：${analysis.ownership.size}/$expected"
                     )
                 }
+                val summary = TerritorySummary.fromOwnership(
+                    ownership = analysis.ownership,
+                    boardSize = state.boardSize,
+                    komi = state.komi
+                )
                 _uiState.update {
                     it.copy(
                         busy = false,
                         analysisRunning = false,
                         analysisVisible = true,
                         analysisOwnership = analysis.ownership,
+                        analysisSummary = summary,
                         analysisVisits = analysis.visits,
-                        status = "形势分析完成（${analysis.visits} visits）"
+                        status = summary?.leadText() ?: "形势分析完成"
                     )
                 }
             } catch (t: CancellationException) {
@@ -455,6 +461,7 @@ class GameViewModel(
                         analysisRunning = false,
                         analysisVisible = false,
                         analysisOwnership = emptyList(),
+                        analysisSummary = null,
                         analysisVisits = 0,
                         status = "形势分析失败",
                         error = t.message
@@ -468,7 +475,7 @@ class GameViewModel(
         suspend fun request() = engine.analyze(
             maxVisits = visits,
             intervalMs = 200,
-            durationMs = 700,
+            durationMs = 2_000,
             turn = _uiState.value.turn,
             includeOwnership = true
         )
@@ -494,12 +501,36 @@ class GameViewModel(
     }
 
     /**
-     * 让 KataGo 做终局数子。
+     * 使用当前局面的形势判断结果进行数子。
      *
-     * 先用 final_score 得到正式结果，再用 ownership 标出黑白地盘。
-     * 数子结果只作为学习参考，不替代正式比赛裁判。
+     * 不再调用 final_score / final_status_list：这两个 GTP 命令在局面尚未
+     * 正式终局或引擎状态异常时容易超时。这里直接复用 whiteOwnership，
+     * 按中国规则统计黑白双方预计占地并计算贴目后的差距。
      */
     fun countScore() {
+        countScoreInternal(endGame = false)
+    }
+
+    /** 连续两次停一手后，由确认弹窗进入正式数子。 */
+    fun confirmEndGameCount() {
+        _uiState.update { it.copy(showEndGamePrompt = false) }
+        countScoreInternal(endGame = true)
+    }
+
+    /** 用户选择暂不数子时结束对局，保留棋盘和悔棋能力。 */
+    fun dismissEndGamePrompt() {
+        _uiState.update {
+            it.copy(
+                showEndGamePrompt = false,
+                busy = false,
+                gameOver = true,
+                status = "双方连续停一手，对局结束"
+            )
+        }
+        viewModelScope.launch { autoSaveGameIfEnabled() }
+    }
+
+    private fun countScoreInternal(endGame: Boolean) {
         val state = _uiState.value
         if (!state.started) {
             _events.tryEmit(GameEvent.Message("请先开始一盘棋"))
@@ -516,98 +547,58 @@ class GameViewModel(
                     busy = true,
                     status = "KataGo 正在数子…",
                     error = null,
-                    scoreVisible = false,
-                    scoreMarkers = emptyList(),
-                    scoreSummary = null,
                     scoreResult = null,
                     analysisVisible = false,
-                    analysisRunning = false,
+                    analysisRunning = true,
                     analysisOwnership = emptyList(),
-                    analysisVisits = 0
+                    analysisSummary = null,
+                    analysisVisits = 0,
+                    showEndGamePrompt = false
                 )
             }
             try {
                 if (!engine.isRunning()) {
                     restoreEngineForPosition(state)
                 }
-                val result = engine.finalScore().trim()
-                if (result.isBlank()) {
-                    throw IllegalStateException("KataGo 没有返回数子结果")
-                }
-
-                // 去掉死子后再标记地盘；final_status_list 失败时退回当前棋盘。
-                val deadStones = runCatching { engine.finalStatusList("dead") }
-                    .getOrDefault("")
-                    .split(Regex("\\s+"))
-                    .mapNotNull { GoCoordinates.parseGtp(it, state.boardSize) }
-                    .toSet()
-                val scoringBoard = if (deadStones.isEmpty()) {
-                    state.board
-                } else {
-                    state.board.copy(stones = state.board.stones - deadStones)
-                }
-
-                val visits = settings.settings.first().aiLevel.analysisVisits.coerceAtLeast(200)
-                var summary: ScoreSummary? = null
-                var markers: List<Float> = emptyList()
-                var analysis: PositionAnalysis? = null
-                try {
-                    if (!engine.isRunning()) {
-                        restoreEngineForPosition(state)
-                    }
-                    analysis = engine.analyze(
-                        maxVisits = visits,
-                        intervalMs = 250,
-                        durationMs = 1_000,
-                        turn = state.turn
-                    )
-                } catch (t: EngineConnectionLostException) {
-                    if (isForeground) {
-                        restoreEngineForPosition(state)
-                        analysis = runCatching {
-                            engine.analyze(
-                                maxVisits = visits,
-                                intervalMs = 250,
-                                durationMs = 1_000,
-                                turn = state.turn
-                            )
-                        }.getOrNull()
-                    }
-                } catch (_: Throwable) {
-                    // 地盘标记失败时仍保留 final_score 的结果。
-                }
-                analysis?.let { resultAnalysis ->
-                    summary = ScoreSummary.fromOwnership(
-                        ownership = resultAnalysis.ownership,
-                        scoringBoard = scoringBoard,
-                        komi = state.komi
-                    )
-                    markers = ScoreSummary.emptyPointMarkers(
-                        ownership = resultAnalysis.ownership,
-                        scoringBoard = scoringBoard
+                val analysis = analyzeOwnershipWithRecovery(
+                    settings.settings.first().aiLevel.analysisVisits
+                )
+                val expected = state.boardSize * state.boardSize
+                if (analysis.ownership.size < expected) {
+                    throw IllegalStateException(
+                        "KataGo 未返回完整领地数据：${analysis.ownership.size}/$expected"
                     )
                 }
+                val summary = TerritorySummary.fromOwnership(
+                    ownership = analysis.ownership,
+                    boardSize = state.boardSize,
+                    komi = state.komi
+                ) ?: throw IllegalStateException("无法根据形势判断计算数子结果")
 
                 _uiState.update {
                     it.copy(
                         busy = false,
-                        gameOver = true,
-                        board = scoringBoard,
-                        scoreVisible = true,
-                        scoreMarkers = markers,
-                        scoreSummary = summary,
-                        scoreResult = result,
-                        status = if (summary == null) {
-                            "数子完成（地盘标记未获取）"
-                        } else {
-                            "数子完成"
-                        }
+                        gameOver = it.gameOver || endGame,
+                        analysisVisible = true,
+                        analysisRunning = false,
+                        analysisOwnership = analysis.ownership,
+                        analysisSummary = summary,
+                        analysisVisits = analysis.visits,
+                        scoreResult = summary.toResultText(),
+                        status = summary.leadText()
                     )
                 }
                 autoSaveGameIfEnabled()
             } catch (t: Throwable) {
                 _uiState.update {
-                    it.copy(busy = false, status = "数子失败", error = t.message)
+                    it.copy(
+                        busy = false,
+                        analysisRunning = false,
+                        analysisVisible = false,
+                        gameOver = it.gameOver || endGame,
+                        status = if (endGame) "对局结束，数子失败" else "数子失败",
+                        error = t.message
+                    )
                 }
             }
         }
@@ -628,6 +619,7 @@ class GameViewModel(
         battery.start()
         val state = _uiState.value
         if (!state.started || state.gameOver) return
+        if (state.showEndGamePrompt) return
         if (engine.isRunning()) return
         viewModelScope.launch {
             _uiState.update { it.copy(busy = true, status = "正在恢复引擎…") }
@@ -662,6 +654,7 @@ class GameViewModel(
                     analysisRunning = false,
                     analysisVisible = false,
                     analysisOwnership = emptyList(),
+                    analysisSummary = null,
                     analysisVisits = 0
                 )
             }
@@ -700,6 +693,10 @@ class GameViewModel(
     private suspend fun maybeAiMove() {
         val state = _uiState.value
         if (state.gameOver) return
+        if (state.showEndGamePrompt) {
+            _uiState.update { it.copy(busy = false) }
+            return
+        }
         if (state.highTemp) {
             // 高温暂停可能发生在 applyMove 之后；必须清除 busy，否则 UI 会一直禁用。
             _uiState.update {
@@ -766,6 +763,7 @@ class GameViewModel(
         positionHistory.add(nextBoard)
         val move = MoveRecord(color, point, moveNumber = current.moves.size + 1)
         val nextMoves = current.moves + move
+        val consecutivePasses = hasTwoConsecutivePasses(nextMoves)
         if (point != null && nextBoard.stoneAt(point) == color) {
             moveSound.play(color)
         }
@@ -775,16 +773,19 @@ class GameViewModel(
                 board = nextBoard,
                 moves = nextMoves,
                 turn = color.opponent,
-                busy = true,
-                scoreVisible = false,
-                scoreMarkers = emptyList(),
-                scoreSummary = null,
+                busy = !consecutivePasses,
                 scoreResult = null,
                 analysisVisible = false,
                 analysisRunning = false,
                 analysisOwnership = emptyList(),
+                analysisSummary = null,
                 analysisVisits = 0,
-                status = if (color == it.humanColor) "KataGo 正在思考…" else "轮到你落子"
+                showEndGamePrompt = consecutivePasses,
+                status = when {
+                    consecutivePasses -> "双方连续停一手，等待确认数子"
+                    color == it.humanColor -> "KataGo 正在思考…"
+                    else -> "轮到你落子"
+                }
             )
         }
     }
@@ -803,3 +804,19 @@ class GameViewModel(
 
 private val StoneColor.chineseName: String
     get() = if (this == StoneColor.BLACK) "黑" else "白"
+
+internal fun hasTwoConsecutivePasses(moves: List<MoveRecord>): Boolean =
+    moves.size >= 2 && moves.takeLast(2).all { it.point == null }
+
+private fun TerritorySummary.toResultText(): String = when {
+    isEven -> "Draw"
+    lead > 0 -> "B+${"%.1f".format(lead)}"
+    else -> "W+${"%.1f".format(kotlin.math.abs(lead))}"
+}
+
+private fun TerritorySummary.leadText(): String {
+    val leader = if (lead >= 0) "黑" else "白"
+    return "形势：黑 $blackArea 目 · " +
+        "白 $whiteArea 目 · " +
+        if (isEven) "双方持平" else "${leader}领先 ${"%.1f".format(kotlin.math.abs(lead))} 目"
+}

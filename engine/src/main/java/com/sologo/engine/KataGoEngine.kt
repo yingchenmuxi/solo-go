@@ -218,9 +218,37 @@ class KataGoEngine(
         includeOwnership: Boolean = true
     ): PositionAnalysis {
         ensureReady()
+        // HumanSL 会让 kata-analyze 的首次输出延迟到几十秒，且 maxVisits 对该
+        // 命令并不总是立即生效。形势图只需要当前局面的神经网络预测，因此直接
+        // 读取普通模型的整盘输出，避免为了 81/169/361 个领地值长时间占用 CPU。
+        if (includeOwnership) {
+            return analyzeOwnershipFromRawNeuralNet(turn)
+        }
         setVisitsInternal(maxVisits.coerceIn(1, config.maxVisits))
-        val infoLines = gtp!!.analyze(intervalMs, durationMs, includeOwnership)
+        val infoLines = gtp!!.analyze(intervalMs, durationMs, ownership = false)
         return parseAnalysis(infoLines, turn)
+    }
+
+    /**
+     * 复盘页的快速下一手候选分析。
+     *
+     * HumanSL 下 kata-analyze 的首包可能等待很久，因此这里读取普通模型的
+     * policy 概率，列出最可能的若干落点。它用于“下一手在哪里”，不用于
+     * 连续 PV 或逐手深度分析。
+     */
+    suspend fun analyzePolicy(turn: StoneColor = StoneColor.BLACK): PositionAnalysis {
+        ensureReady()
+        var lastError: Throwable? = null
+        repeat(2) { attempt ->
+            try {
+                val raw = readRawNeuralNet(requireOwnership = false)
+                return parsePolicyFromRawNeuralNet(raw, turn)
+            } catch (t: KataGoException) {
+                lastError = t
+                Log.w(TAG, "读取 raw policy 失败，第 ${attempt + 1} 次: ${t.message}")
+            }
+        }
+        throw lastError ?: KataGoException("KataGo 未返回 policy 数据")
     }
 
     fun stopSearch() {
@@ -377,6 +405,136 @@ class KataGoEngine(
             order = if (order == Int.MAX_VALUE) candidatesFallbackOrder(visits) else order,
             pv = pv,
             ownership = ownership
+        )
+    }
+
+    /**
+     * kata-raw-nn 只执行一次普通神经网络推理，不进入 HumanSL 的慢速搜索。
+     * 返回值固定使用白方视角：whiteOwnership 为正表示白方势力，因此这里
+     * 统一取反后保存为 App 内部的黑方视角。
+     */
+    private suspend fun analyzeOwnershipFromRawNeuralNet(
+        turn: StoneColor
+    ): PositionAnalysis {
+        val raw = readRawNeuralNet(requireOwnership = true)
+        val tokens = raw.trim().split(Regex("\\s+"))
+        val expected = boardSize * boardSize
+        val ownershipStart = tokens.indexOf("whiteOwnership")
+        if (ownershipStart < 0) {
+            throw KataGoException("KataGo 未返回完整领地数据：缺少 whiteOwnership")
+        }
+
+        val whiteOwnership = ArrayList<Float>(expected)
+        var index = ownershipStart + 1
+        while (index < tokens.size && whiteOwnership.size < expected) {
+            val value = parseFloatToken(tokens[index]) ?: break
+            whiteOwnership.add(value)
+            index++
+        }
+        if (whiteOwnership.size < expected) {
+            throw KataGoException(
+                "KataGo 未返回完整领地数据：${whiteOwnership.size}/$expected"
+            )
+        }
+
+        val blackOwnership = whiteOwnership.map { value ->
+            if (value.isFinite()) (-value).coerceIn(-1f, 1f) else 0f
+        }
+        val whiteWin = valueAfter(tokens, "whiteWin")?.toDoubleOrNull()
+        val whiteLead = valueAfter(tokens, "whiteLead")?.toDoubleOrNull()
+        val rootCandidate = if (whiteWin != null && whiteLead != null) {
+            CandidateMove(
+                move = null,
+                winrate = (1.0 - whiteWin).coerceIn(0.0, 1.0),
+                scoreLead = -whiteLead,
+                visits = 0,
+                order = 0
+            )
+        } else {
+            null
+        }
+
+        return PositionAnalysis(
+            turn = turn,
+            candidates = listOfNotNull(rootCandidate),
+            ownership = blackOwnership,
+            ownershipSize = boardSize,
+            visits = 0
+        )
+    }
+
+    private fun valueAfter(tokens: List<String>, key: String): String? {
+        val index = tokens.indexOf(key)
+        return if (index >= 0) tokens.getOrNull(index + 1) else null
+    }
+
+    private suspend fun readRawNeuralNet(requireOwnership: Boolean): String =
+        gtp?.rawNeuralNet(
+            expectedPoints = boardSize * boardSize,
+            requireOwnership = requireOwnership
+        ) ?: throw EngineNotReadyException()
+
+    private fun parseFloatToken(token: String): Float? =
+        if (token.equals("NAN", ignoreCase = true)) {
+            Float.NaN
+        } else {
+            token.toFloatOrNull()
+        }
+
+    private fun parsePolicyFromRawNeuralNet(
+        raw: String,
+        turn: StoneColor
+    ): PositionAnalysis {
+        val tokens = raw.trim().split(Regex("\\s+"))
+        val expected = boardSize * boardSize
+        val policyStart = tokens.indexOf("policy")
+        if (policyStart < 0) {
+            throw KataGoException("KataGo 未返回 policy 数据")
+        }
+        val policy = ArrayList<Float>(expected)
+        var index = policyStart + 1
+        while (index < tokens.size && policy.size < expected) {
+            val value = parseFloatToken(tokens[index]) ?: break
+            policy.add(value)
+            index++
+        }
+        if (policy.size < expected) {
+            throw KataGoException("KataGo 返回的 policy 不完整：${policy.size}/$expected")
+        }
+
+        val whiteWin = valueAfter(tokens, "whiteWin")?.toDoubleOrNull() ?: 0.5
+        val whiteLead = valueAfter(tokens, "whiteLead")?.toDoubleOrNull() ?: 0.0
+        val blackWinrate = (1.0 - whiteWin).coerceIn(0.0, 1.0)
+        val blackLead = -whiteLead
+        val candidates = policy.mapIndexedNotNull { pointIndex, probability ->
+            if (!probability.isFinite() || probability <= 0f) {
+                null
+            } else {
+                val point = GoPoint(
+                    x = pointIndex % boardSize,
+                    y = pointIndex / boardSize
+                )
+                probability to CandidateMove(
+                    move = point,
+                    winrate = blackWinrate,
+                    scoreLead = blackLead,
+                    visits = 0,
+                    order = 0,
+                    pv = listOf(point)
+                )
+            }
+        }
+            .sortedByDescending { it.first }
+            .take(12)
+            .mapIndexed { order, (_, candidate) -> candidate.copy(order = order) }
+        Log.d(TAG, "raw policy parsed=$expected candidates=${candidates.size}")
+
+        return PositionAnalysis(
+            turn = turn,
+            candidates = candidates,
+            ownership = emptyList(),
+            ownershipSize = boardSize,
+            visits = 0
         )
     }
 
